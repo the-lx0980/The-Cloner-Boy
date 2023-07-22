@@ -39,8 +39,10 @@ async def forward(bot, query):
         await query.message.edit("Trying to cancel forwarding...")
         CANCEL[query.from_user.id] = True
 
-
-
+@Client.on_message(filters.regex('cancel'))
+async def cancel_forward(bot, message):
+    await message.reply("Trying to cancel forwarding...")
+    CANCEL[query.from_user.id] = True
 
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
@@ -91,9 +93,10 @@ async def send_for_forward(bot, message):
     approval = await message.chat.ask(
         text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code> Else Send Me "<code>no</code>"'''
     )
+    approval = approval.text
     if approval.strip() == "yes":
         if FORWARDING.get(query.from_user.id):
-            return await message.answer('Wait until previous process complete.', show_alert=True)
+            return await message.reply('Wait until previous process complete.')
 
         msg = message
         await msg.edit('Starting Forwarding...')
@@ -111,7 +114,6 @@ async def send_for_forward(bot, message):
             
      
         
-    
 
 @Client.on_message(filters.private & filters.command(['set_skip']))
 async def set_skip_number(bot, message):
