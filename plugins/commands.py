@@ -21,7 +21,7 @@ Caption formats:
 `{caption}` - Default file caption.
 
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
-    await m.reply(f"👋 Hello {message.from_user.mention},\n\n{text}")
+    await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")
 
 
 @Client.on_message(filters.command('id'))
