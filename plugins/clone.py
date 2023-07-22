@@ -17,9 +17,13 @@ CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
-    await message.reply("Trying to cancel forwarding...")
-    CANCEL[message.from_user.id] = True
-
+    cancel = await message.reply("Trying to cancel forwarding...")
+    if FORWARDING.get(message.from_user.id):
+        CANCEL[message.from_user.id] = True
+        await cancel.edit("Successfully Forward Canceled!")
+    else:
+        await cancel.edit("No Forward Countinue Currently!")
+        
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
     if message.text:
