@@ -1,17 +1,15 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from config import Config
 
-
-@Client.on_message(filters.private & filters.command(["start"]) & filters.incoming)
+@Client.on_message(filters.private & (filters.command("start") | filters.regex("start")) & filters.incoming)
 async def start(client, message):
-    btn = [[
-        InlineKeyboardButton('Updates Channel', url='https://t.me/Lx0980AI')
-    ]]
+    if message.chat.id not in Config.ADMINS:
+        return 
     text = """I can forward document and video (mp4 and mkv) files.
 
 Forward your source channel message to this bot. If source channel is forward restricted last message link send to this bot.
 
-/id - Get ID
 /set_skip - Set skip message.
 /set_channel - Set target channel.
 /set_caption - Set file caption.
@@ -22,7 +20,7 @@ Caption formats:
 `{caption}` - Default file caption.
 
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
-    await message.reply(f"👋 Hello {message.from_user.mention},\n\n{text}", reply_markup=InlineKeyboardMarkup(btn))
+    await message.reply(f"👋 Hello {message.from_user.mention},\n\n{text}")
 
 
 @Client.on_message(filters.command('id'))
