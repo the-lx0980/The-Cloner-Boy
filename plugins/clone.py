@@ -4,7 +4,7 @@ import logging
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-import config.Config.FILE_CAPTION
+from config import Config
 
 logger = logging.getLogger(__name__)
 
