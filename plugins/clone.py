@@ -91,7 +91,7 @@ async def send_for_forward(bot, message):
         caption = FILE_CAPTION
     # last_msg_id is same to total messages
     approval = await message.chat.ask(
-        text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code> Else Send Me "<code>no</code>"'''
+        text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code>" Else Send Me "<code>no</code>"'''
     )
     approval = approval.text.lower()  
     if approval.strip() == "yes":
