@@ -8,6 +8,8 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+FILE_CAPTION = Config.FILE_CAPTION
+
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
