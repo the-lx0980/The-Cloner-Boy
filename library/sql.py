@@ -15,10 +15,7 @@ custom_caption = {}         # Custom caption key
 master_index = []           # Unique id index of cloning medias (including target chat)
 file_types = ["document", "video", "audio", "voice", "photo", "text"]
 
-if bool(os.environ.get("ENV", False)):
-    from sample_config import Config
-else:
-    from config import Config
+from config import Config
 
 def start() -> scoped_session:
     engine = create_engine(Config.DB_URI, client_encoding="utf8")
