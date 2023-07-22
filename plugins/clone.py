@@ -93,16 +93,15 @@ async def send_for_forward(bot, message):
     approval = await message.chat.ask(
         text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code> Else Send Me "<code>no</code>"'''
     )
-    approval = approval.text
+    approval = approval.text.lower()  
     if approval.strip() == "yes":
         if FORWARDING.get(message.from_user.id):
             return await message.reply('Wait until previous process complete.')
-
         msg = await message.reply('Starting Forwarding...')
         try:
-            chat = int(chat)
+            chat = int(chat_id)
         except:
-            chat = chat
+            chat = chat_id
         await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id)
     else:
         if approval.strip() == "no":
@@ -110,10 +109,7 @@ async def send_for_forward(bot, message):
         else:
             return await message.reply("Invalid reply, Try Again!")
             
-            
-     
-        
-
+                    
 @Client.on_message(filters.private & filters.command(['set_skip']))
 async def set_skip_number(bot, message):
     try:
