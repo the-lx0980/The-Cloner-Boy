@@ -58,7 +58,7 @@ async def send_for_forward(bot, message):
         return
 
     try:
-        source_chat = await bot.get_chat(chat_id)
+        source_chat = await bot.USER.get_chat(chat_id)
     except Exception as e:
         return await message.reply(f'Error - {e}')
 
