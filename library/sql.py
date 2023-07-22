@@ -5,7 +5,6 @@ from sqlalchemy import Column, Boolean, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-
 clone_cancel_key = {}       # Clone cancel status key
 clone_btn_count = {}        # Clone button single click actuator key
 index_skip_key = {}         # Skip indexing function key
@@ -17,19 +16,17 @@ file_types = ["document", "video", "audio", "voice", "photo", "text"]
 
 from config import Config
 
-DB_URl = "mongodb+srv://filesautobot:filesautobot870@cluster0.qcxdkpw.mongodb.net/?retryWrites=true&w=majority"
+DB_URI = "mongodb+srv://filesautobot:filesautobot870@cluster0.qcxdkpw.mongodb.net/?retryWrites=true&w=majority"
 
 def start() -> scoped_session:
-    engine = create_engine(DB_URI, client_encoding="utf8")
+    engine = create_engine(DB_URI)
     BASE.metadata.bind = engine
     BASE.metadata.create_all(engine)
     return scoped_session(sessionmaker(bind=engine, autoflush=False))
 
-
 BASE = declarative_base()
 SESSION = start()
 INSERTION_LOCK = threading.RLock()
-
 
 class Clonebot(BASE):
     __tablename__ = "clonebot"
@@ -63,9 +60,7 @@ class Clonebot(BASE):
         self.file_caption = file_caption
         self.last_msg_id = last_msg_id
 
-
 Clonebot.__table__.create(checkfirst=True)
-
 
 async def add_user(id):
     with INSERTION_LOCK:
