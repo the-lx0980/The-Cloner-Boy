@@ -106,9 +106,9 @@ async def set_skip_number(bot, message):
 
 
 @Client.on_message(filters.private & filters.command(['set_channel']))
-async def set_target_channel(bot, message):
-    if message.chat.id not in Config.ADMINS:
-        return
+async def set_target_channel(bot, message):    
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
     try:
         _, chat_id = message.text.split(" ")
     except:
