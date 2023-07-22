@@ -1,10 +1,17 @@
-#----------------------------------- https://github.com/m4mallu/clonebot --------------------------------------------#
-import os
-import sys
+import logging
+import logging.config
+
+# Get logging configurations
+logging.config.fileConfig('logging.conf')
+logging.getLogger().setLevel(logging.INFO)
+logging.getLogger("pyrogram").setLevel(logging.ERROR)
+
+from pyrogram.raw.all import layer
 from user import User
 from pyrogram import Client
-from presets import Presets as Msg
 from pyrogram.enums import ParseMode
+from typing import Union, Optional, AsyncGenerator
+from pyrogram import types
 
 from config import Config, LOGGER
 
@@ -35,12 +42,20 @@ class Bot(Client):
             f"@{usr_bot_me.username}  started! "
         )
         self.USER, self.USER_ID = await User().start()
-        try:
-            await self.USER.send_message(usr_bot_me.username, "%session_start%")
-        except Exception:
-            print(Msg.BOT_BLOCKED_MSG)
-            sys.exit()
+
 
     async def stop(self, *args):
         await super().stop()
         self.LOGGER(__name__).info("Bot stopped. Bye.")
+    
+    async def iter_messages(self, chat_id: Union[int, str], limit: int, offset: int = 0) -> Optional[AsyncGenerator["types.Message", None]]:
+        current = offset
+        while True:
+            new_diff = min(200, limit - current)
+            if new_diff <= 0:
+                return
+            messages = await self.get_messages(chat_id, list(range(current, current+new_diff+1)))
+            for message in messages:
+                yield message
+                current += 1
+
