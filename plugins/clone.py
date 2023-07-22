@@ -3,7 +3,6 @@ import re
 import logging
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import Config
 
 logger = logging.getLogger(__name__)
