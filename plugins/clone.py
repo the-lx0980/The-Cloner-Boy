@@ -208,7 +208,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                     caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
                 )
             forwarded += 1
-            await asyncio.sleep(1)
+            await asyncio.sleep(4)
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
