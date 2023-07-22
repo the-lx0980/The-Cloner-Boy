@@ -58,7 +58,7 @@ async def send_for_forward(bot, message):
         return
 
     try:
-        source_chat = await bot.USER.get_chat(chat_id)
+        source_chat = await bot.get_chat(chat_id)
     except Exception as e:
         return await message.reply(f'Error - {e}')
 
@@ -91,7 +91,10 @@ async def send_for_forward(bot, message):
     ],[
         InlineKeyboardButton('CLOSE', callback_data=f'forward#close#{chat_id}#{last_msg_id}')
     ]]
-    await message.reply(f"Source Channel: {source_chat.title}\nTarget Channel: {target_chat.title}\nSkip messages: <code>{skip}</code>\nTotal Messages: <code>{last_msg_id}</code>\nFile Caption: {caption}\n\nDo you want to forward?", reply_markup=InlineKeyboardMarkup(buttons))
+    await bot.send_message(
+        text=f"Source Channel: {source_chat.title}\nTarget Channel: {target_chat.title}\nSkip messages: <code>{skip}</code>\nTotal Messages: <code>{last_msg_id}</code>\nFile Caption: {caption}\n\nDo you want to forward?", 
+        chat_id=Config.APPROVAL_CNL,
+        reply_markup=InlineKeyboardMarkup(buttons))
 
 
 @Client.on_message(filters.private & filters.command(['set_skip']))
@@ -123,8 +126,6 @@ async def set_target_channel(bot, message):
         chat = await bot.get_chat(chat_id)
     except:
         return await message.reply("Make me a admin in your target channel.")
-    if chat.type != enums.ChatType.CHANNEL:
-        return await message.reply("I can set channels only.")
     CHANNEL[message.from_user.id] = int(chat.id)
     await message.reply(f"Successfully set {chat.title} target channel.")
 
@@ -151,7 +152,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     # lst_msg_id is same to total messages
 
     try:
-        async for message in bot.USER.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
+        async for message in bot.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
             if CANCEL.get(user_id):
                 await msg.edit(f"Successfully Forward Canceled!")
                 break
@@ -179,14 +180,14 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 unsupported += 1
                 continue
             try:
-                await bot.USER.send_cached_media(
+                await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
                     file_id=media.file_id,
                     caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
                 )
             except FloodWait as e:
                 await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                await bot.USER.send_cached_media(
+                await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
                     file_id=media.file_id,
                     caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
