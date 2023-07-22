@@ -1,5 +1,3 @@
-#----------------------------------- https://github.com/m4mallu/clonebot --------------------------------------------#
-import os
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from config import Config, LOGGER
