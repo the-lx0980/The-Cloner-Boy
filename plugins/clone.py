@@ -104,7 +104,7 @@ async def send_for_forward(bot, message):
             chat = int(chat)
         except:
             chat = chat
-        await forward_files(int(lst_msg_id), chat, msg, bot, query.from_user.id)
+        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id)
     else:
         if approval.strip() == "no":
             return await message.reply("Okay")
