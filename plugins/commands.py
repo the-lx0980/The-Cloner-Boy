@@ -1,10 +1,11 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from config import Config
+from config import Config as a
+
 
 @Client.on_message(filters.private & (filters.command("start") | filters.regex("start")) & filters.incoming)
-async def start(client, message):
-    if message.chat.id not in Config.ADMINS:
+async def start(_, m):
+    if a.ADMINS and not ((str(m.from_user.id) in a.ADMINS) or (m.from_user.username in a.ADMINS)):
         return 
     text = """I can forward document and video (mp4 and mkv) files.
 
@@ -20,7 +21,7 @@ Caption formats:
 `{caption}` - Default file caption.
 
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
-    await message.reply(f"👋 Hello {message.from_user.mention},\n\n{text}")
+    await m.reply(f"👋 Hello {message.from_user.mention},\n\n{text}")
 
 
 @Client.on_message(filters.command('id'))
