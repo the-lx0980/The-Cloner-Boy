@@ -25,7 +25,7 @@ class Bot(Client):
             name="bot_session",
             api_hash=Config.API_HASH,
             api_id=Config.APP_ID,
-            bot_token=Config.TG_BOT_TOKEN,
+            session_string=Config.TG_USER_SESSION,
             sleep_threshold=30,
             workers=8,
             plugins={
@@ -41,7 +41,7 @@ class Bot(Client):
         self.LOGGER(__name__).info(
             f"@{usr_bot_me.username}  started! "
         )
-        self.USER, self.USER_ID = await User().start()
+#        self.USER, self.USER_ID = await User().start()
 
 
     async def stop(self, *args):
