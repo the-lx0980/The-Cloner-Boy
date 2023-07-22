@@ -17,8 +17,10 @@ file_types = ["document", "video", "audio", "voice", "photo", "text"]
 
 from config import Config
 
+DB_URL = "mongodb+srv://filesautobot:filesautobot870@cluster0.qcxdkpw.mongodb.net/?retryWrites=true&w=majority"
+
 def start() -> scoped_session:
-    engine = create_engine(Config.DB_URI, client_encoding="utf8")
+    engine = create_engine(DB_URI, client_encoding="utf8")
     BASE.metadata.bind = engine
     BASE.metadata.create_all(engine)
     return scoped_session(sessionmaker(bind=engine, autoflush=False))
