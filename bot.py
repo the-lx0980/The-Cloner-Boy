@@ -6,6 +6,7 @@ logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
 logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
+from pyromod import listen
 from pyrogram.raw.all import layer
 from user import User
 from pyrogram import Client
