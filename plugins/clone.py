@@ -104,6 +104,8 @@ async def set_skip_number(bot, message):
 
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):
+    if message.chat.id not in Config.ADMINS:
+        return
     try:
         _, chat_id = message.text.split(" ")
     except:
