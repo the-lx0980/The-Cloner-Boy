@@ -98,8 +98,7 @@ async def send_for_forward(bot, message):
         if FORWARDING.get(message.from_user.id):
             return await message.reply('Wait until previous process complete.')
 
-        msg = message
-        await msg.edit('Starting Forwarding...')
+        msg = await message.reply('Starting Forwarding...')
         try:
             chat = int(chat)
         except:
