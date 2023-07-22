@@ -16,29 +16,6 @@ CANCEL = {}
 FORWARDING = {}
 CAPTION = {}
 
-@Client.on_callback_query(filters.regex(r'^forward'))
-async def forward(bot, query):
-    _, ident, chat, lst_msg_id = query.data.split("#")
-    if ident == 'yes':
-        if FORWARDING.get(query.from_user.id):
-            return await query.answer('Wait until previous process complete.', show_alert=True)
-
-        msg = query.message
-        await msg.edit('Starting Forwarding...')
-        try:
-            chat = int(chat)
-        except:
-            chat = chat
-        await forward_files(int(lst_msg_id), chat, msg, bot, query.from_user.id)
-
-    elif ident == 'close':
-        await query.answer("Okay!")
-        await query.message.delete()
-
-    elif ident == 'cancel':
-        await query.message.edit("Trying to cancel forwarding...")
-        CANCEL[query.from_user.id] = True
-
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
     await message.reply("Trying to cancel forwarding...")
