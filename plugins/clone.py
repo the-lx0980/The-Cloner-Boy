@@ -1,199 +1,209 @@
-# ----------------------------------- https://github.com/m4mallu/clonebot ---------------------------------------------#
-import time
-import pytz
 import asyncio
-from bot import Bot
-from math import trunc
-from library.sql import *
-from presets import Presets
-from datetime import datetime
-from pyrogram.types import Message
-from pyrogram.enums import ParseMode
+import re
+import logging
+from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
-from library.buttons import reply_markup_stop, reply_markup_finished
-from library.chat_support import calc_percentage, calc_progress, save_target_cfg, set_to_defaults, date_time_calc
-#
-bot_start_time = time.time()
-#
-async def clone_medias(bot: Bot, m: Message):
-    id = int(m.chat.id)
-    query = await query_msg(id)
-    clone_cancel_key[id] = int(m.id)
-    #
-    start_time = time.time()
-    start_date = datetime.today().strftime("%d/%m/%y")
-    clone_start_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%I:%M %p')
-    #
-    file_name = caption = report = str()
-    #
-    delay = limit = doc = video = audio = text = voice = photo = total_copied = matching = msg_id = int()
-    #
-    # Create mandatory variables from the database query
-    source_chat = int(query.s_chat)
-    target_chat = int(query.d_chat)
-    start_id = int(query.from_id)
-    end_id = int(query.to_id)
-    end_msg_id = int(query.last_msg_id)
-    #
-    clone_delay = bool(query.delayed_clone)
-    default_caption = bool(query.caption)
-    fn_caption = bool(query.file_caption)
-    #
-    # Define the clone delay
-    if bool(clone_delay):
-        delay = 10
-    else:
-        delay = 3
-    #
-    # The vaulues will be swithed if the start message id is greater than the end message id
-    if start_id > end_id:
-        start_id = start_id ^ end_id
-        end_id = end_id ^ start_id
-        start_id = start_id ^ end_id
-    else:
-        pass
-    #
-    # Creating variables for progress bar and the percentage calculation
-    if not bool(start_id):
-        sp = 0
-    else:
-        sp = start_id
-    if not bool(end_id):
-        ep = end_msg_id
-    else:
-        ep = end_id
-    #
-    await m.edit_text(Presets.INITIAL_MESSAGE_TEXT)
-    await asyncio.sleep(1)
-    msg = await m.reply_text(Presets.WAIT_MSG, reply_markup=reply_markup_stop)
-    #
-    for offset in reversed(
-            range(end_id+1, (1 if not bool(start_id) else start_id)-1, (start_id - 1) if not bool(start_id) else -1)):
-        async for user_message in bot.USER.get_chat_history(chat_id=source_chat, offset_id=offset, limit=1):
-            if not user_message.empty:
-                messages = await bot.USER.get_messages(source_chat, user_message.id, replies=0)
-                msg_id = messages.id
-                cur_time = time.time()
-                cur_date = datetime.today().strftime("%d/%m/%y")
-                days, hours = await date_time_calc(start_date, start_time, cur_date, cur_time)
-                #
-                report = Presets.CLONE_REPORT.format(time.strftime("%I:%M %p"), source_chat, target_chat,
-                                                     "1" if not bool(start_id) else start_id,
-                                                     end_msg_id if not bool(msg_id) else msg_id,
-                                                     "🟡" if bool(clone_delay) else "🚫",
-                                                     "🟡" if bool(default_caption) else "🚫",
-                                                     "🟡" if bool(fn_caption) else "🚫",
-                                                     int(total_copied), doc, video, audio, photo, voice, text, matching)
-                # If the user cancelled the clone operation
-                if id not in clone_cancel_key:
-                    await save_target_cfg(id, target_chat)
-                    if not int(total_copied):
-                        await m.delete()
-                    await asyncio.sleep(2)
-                    await msg.edit(Presets.CANCELLED_MSG, reply_markup=reply_markup_finished)
-                    await bot.USER.send_message("me", report, disable_web_page_preview=True)
-                    await set_to_defaults(id)
-                    return
-                else:
-                    pass
-                for file_type in file_types:
-                    media = getattr(messages, file_type, None)
-                    if media is not None:
-                        uid = str(media.file_unique_id) if hasattr(media, 'file_unique_id') else None
-                        # If the duplicate file id is found while cloning operation
-                        if (uid is not None) and (uid in master_index):
-                            matching += 1
-                            await m.edit(Presets.DUPLICATE_INDEX.format(matching, msg_id))
-                        # if the duplicate file is not found while cloning
-                        else:
-                            if uid is not None:
-                                master_index.append(uid) # The unique id of the file is added to the master index list
-                            if file_type == 'document': doc += 1; file_name = messages.document.file_name
-                            elif file_type == 'video': video += 1; file_name = messages.video.file_name
-                            elif file_type == 'audio': audio += 1; file_name = messages.audio.file_name
-                            elif file_type == "voice": voice += 1; file_name = messages.caption
-                            elif file_type == "photo": photo += 1; file_name = messages.caption
-                            elif file_type == "text": text += 1; file_name = str()
-                            else: pass
-                            #
-                            if (file_type != "text") and (id in custom_caption):
-                                caption = custom_caption[id]
-                            elif bool(default_caption):
-                                caption = messages.caption
-                            elif bool(fn_caption):
-                                try:
-                                    caption = str(file_name).rsplit('.', 1)[0]
-                                except Exception:
-                                    caption = str()
-                            else:
-                                caption = str()
-                            #
-                            total_copied = doc + video + audio + voice + photo + text
-                            pct = await calc_percentage(sp, ep, msg_id)
-                            update_time = datetime.now(pytz.timezone('Asia/Kolkata')).strftime('%I:%M %p')
-                            try:
-                                await m.edit(
-                                    Presets.MESSAGE_COUNT.format(
-                                        int(msg_id),
-                                        int(total_copied),
-                                        trunc(pct) if pct <= 100 else "- ",
-                                        days,
-                                        hours,
-                                        clone_start_time,
-                                        update_time
-                                    ),
-                                    parse_mode=ParseMode.HTML,
-                                    disable_web_page_preview=True
-                                )
-                            except FloodWait as e:
-                                await asyncio.sleep(e.value)
-                            except Exception:
-                                pass
-                            progress = await calc_progress(pct)
-                            try:
-                                await bot.USER.copy_message(
-                                    chat_id=target_chat,
-                                    from_chat_id=source_chat,
-                                    caption=caption if bool(caption) else str(),
-                                    message_id=msg_id,
-                                    reply_markup=messages.reply_markup,
-                                    disable_notification=True
-                                )
-                            except FloodWait as e:
-                                await asyncio.sleep(e.value)
-                            except Exception:
-                                await msg.edit_text(Presets.COPY_ERROR, reply_markup=reply_markup_finished)
-                                await bot.USER.send_message("me", report, disable_web_page_preview=True)
-                                await set_to_defaults(id)
-                                if not int(total_copied):
-                                    await m.delete()
-                                return
-                            try:
-                                await msg.edit("🇮🇳 | " + progress if pct <= 100 else Presets.BLOCK,
-                                               reply_markup=reply_markup_stop)
-                            except Exception:
-                                pass
-                            await asyncio.sleep(delay)
-                            # If the end id is reached, the clone operation will be aborted and the report is generated
-                            if end_id and (int(msg_id) >= end_id):
-                                if not int(total_copied):
-                                    await m.delete()
-                                await msg.edit(Presets.FINISHED_TEXT, reply_markup=reply_markup_finished)
-                                await bot.USER.send_message("me", report, disable_web_page_preview=True)
-                                await set_to_defaults(id)
-                                return
-                            else:
-                                pass
-                    else:
-                        pass
-            else:
-                pass
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import Config.FILE_CAPTION
+logger = logging.getLogger(__name__)
 
-    # If the clone operation is automatically completed by the bot
-    await save_target_cfg(id, target_chat)
-    if not int(total_copied):
-        await m.delete()
-    await m.edit_reply_markup(None)
-    await msg.edit(Presets.FINISHED_TEXT, reply_markup=reply_markup_finished)
-    await bot.USER.send_message("me", report, disable_web_page_preview=True)
-    await set_to_defaults(id)
+# Setup database yourself. If you need setup database contact @Hansaka_Anuhas for paid edits
+CURRENT = {}
+CHANNEL = {}
+CANCEL = {}
+FORWARDING = {}
+CAPTION = {}
+
+@Client.on_callback_query(filters.regex(r'^forward'))
+async def forward(bot, query):
+    _, ident, chat, lst_msg_id = query.data.split("#")
+    if ident == 'yes':
+        if FORWARDING.get(query.from_user.id):
+            return await query.answer('Wait until previous process complete.', show_alert=True)
+
+        msg = query.message
+        await msg.edit('Starting Forwarding...')
+        try:
+            chat = int(chat)
+        except:
+            chat = chat
+        await forward_files(int(lst_msg_id), chat, msg, bot, query.from_user.id)
+
+    elif ident == 'close':
+        await query.answer("Okay!")
+        await query.message.delete()
+
+    elif ident == 'cancel':
+        await query.message.edit("Trying to cancel forwarding...")
+        CANCEL[query.from_user.id] = True
+
+
+@Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
+async def send_for_forward(bot, message):
+    if message.text:
+        regex = re.compile("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
+        match = regex.match(message.text)
+        if not match:
+            return await message.reply('Invalid link for forward!')
+        chat_id = match.group(4)
+        last_msg_id = int(match.group(5))
+        if chat_id.isnumeric():
+            chat_id  = int(("-100" + chat_id))
+    elif message.forward_from_chat.type == enums.ChatType.CHANNEL:
+        last_msg_id = message.forward_from_message_id
+        chat_id = message.forward_from_chat.username or message.forward_from_chat.id
+    else:
+        return
+
+    try:
+        source_chat = await bot.get_chat(chat_id)
+    except Exception as e:
+        return await message.reply(f'Error - {e}')
+
+    if source_chat.type != enums.ChatType.CHANNEL:
+        return await message.reply("I can forward only channels.")
+
+    target_chat_id = CHANNEL.get(message.from_user.id)
+    if not target_chat_id:
+        return await message.reply("You not added target channel.\nAdd using /set_channel command.")
+
+    try:
+        target_chat = await bot.get_chat(target_chat_id)
+    except Exception as e:
+        return await message.reply(f'Error - {e}')
+
+    skip = CURRENT.get(message.from_user.id)
+    if skip:
+        skip = skip
+    else:
+        skip = 0
+
+    caption = CAPTION.get(message.from_user.id)
+    if caption:
+        caption = caption
+    else:
+        caption = FILE_CAPTION
+    # last_msg_id is same to total messages
+    buttons = [[
+        InlineKeyboardButton('YES', callback_data=f'forward#yes#{chat_id}#{last_msg_id}')
+    ],[
+        InlineKeyboardButton('CLOSE', callback_data=f'forward#close#{chat_id}#{last_msg_id}')
+    ]]
+    await message.reply(f"Source Channel: {source_chat.title}\nTarget Channel: {target_chat.title}\nSkip messages: <code>{skip}</code>\nTotal Messages: <code>{last_msg_id}</code>\nFile Caption: {caption}\n\nDo you want to forward?", reply_markup=InlineKeyboardMarkup(buttons))
+
+
+@Client.on_message(filters.private & filters.command(['set_skip']))
+async def set_skip_number(bot, message):
+    try:
+        _, skip = message.text.split(" ")
+    except:
+        return await message.reply("Give me a skip number.")
+    try:
+        skip = int(skip)
+    except:
+        return await message.reply("Only support in numbers.")
+    CURRENT[message.from_user.id] = int(skip)
+    await message.reply(f"Successfully set <code>{skip}</code> skip number.")
+
+
+@Client.on_message(filters.private & filters.command(['set_channel']))
+async def set_target_channel(bot, message):
+    try:
+        _, chat_id = message.text.split(" ")
+    except:
+        return await message.reply("Give me a target channel ID")
+    try:
+        chat_id = int(chat_id)
+    except:
+        return await message.reply("Give me a valid ID")
+
+    try:
+        chat = await bot.get_chat(chat_id)
+    except:
+        return await message.reply("Make me a admin in your target channel.")
+    if chat.type != enums.ChatType.CHANNEL:
+        return await message.reply("I can set channels only.")
+    CHANNEL[message.from_user.id] = int(chat.id)
+    await message.reply(f"Successfully set {chat.title} target channel.")
+
+
+@Client.on_message(filters.private & filters.command(['set_caption']))
+async def set_caption(bot, message):
+    try:
+        caption = message.text.split(" ", 1)[1]
+    except:
+        return await message.reply("Give me a caption.")
+    CAPTION[message.from_user.id] = caption
+    await message.reply(f"Successfully set file caption.\n\n{caption}")
+    
+    
+    
+async def forward_files(lst_msg_id, chat, msg, bot, user_id):
+    current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+    forwarded = 0
+    deleted = 0
+    unsupported = 0
+    fetched = 0
+    CANCEL[user_id] = False
+    FORWARDING[user_id] = True
+    # lst_msg_id is same to total messages
+
+    try:
+        async for message in bot.USER.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
+            if CANCEL.get(user_id):
+                await msg.edit(f"Successfully Forward Canceled!")
+                break
+            current += 1
+            fetched += 1
+            if current % 20 == 0:
+                btn = [[
+                    InlineKeyboardButton('CANCEL', callback_data=f'forward#cancel#{chat}#{lst_msg_id}')
+                ]]
+                await msg.edit_text(text=f"Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>", reply_markup=InlineKeyboardMarkup(btn))
+            if message.empty:
+                deleted += 1
+                continue
+            elif not message.media:
+                unsupported += 1
+                continue
+            elif message.media not in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO]:  # Non documents and videos files skipping
+                unsupported += 1
+                continue
+            media = getattr(message, message.media.value, None)
+            if not media:
+                unsupported += 1
+                continue
+            elif media.mime_type not in ['video/mp4', 'video/x-matroska']:  # Non mp4 and mkv files types skipping
+                unsupported += 1
+                continue
+            try:
+                await bot.USER.send_cached_media(
+                    chat_id=CHANNEL.get(user_id),
+                    file_id=media.file_id,
+                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
+                )
+            except FloodWait as e:
+                await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                await bot.USER.send_cached_media(
+                    chat_id=CHANNEL.get(user_id),
+                    file_id=media.file_id,
+                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
+                )
+            forwarded += 1
+            await asyncio.sleep(1)
+    except Exception as e:
+        logger.exception(e)
+        await msg.reply(f"Forward Canceled!\n\nError - {e}")
+    else:
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>')
+        FORWARDING[user_id] = False
+
+
+def get_size(size):
+    units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"]
+    size = float(size)
+    i = 0
+    while size >= 1024.0 and i < len(units):
+        i += 1
+        size /= 1024.0
+    return "%.2f %s" % (size, units[i])
