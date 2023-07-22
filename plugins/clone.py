@@ -95,7 +95,7 @@ async def send_for_forward(bot, message):
     )
     approval = approval.text
     if approval.strip() == "yes":
-        if FORWARDING.get(query.from_user.id):
+        if FORWARDING.get(message.from_user.id):
             return await message.reply('Wait until previous process complete.')
 
         msg = message
