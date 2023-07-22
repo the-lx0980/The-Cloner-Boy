@@ -86,16 +86,30 @@ async def send_for_forward(bot, message):
     else:
         caption = FILE_CAPTION
     # last_msg_id is same to total messages
-    buttons = [[
-        InlineKeyboardButton('YES', callback_data=f'forward#yes#{chat_id}#{last_msg_id}')
-    ],[
-        InlineKeyboardButton('CLOSE', callback_data=f'forward#close#{chat_id}#{last_msg_id}')
-    ]]
-    await bot.send_message(
-        text=f"Source Channel: {source_chat.title}\nTarget Channel: {target_chat.title}\nSkip messages: <code>{skip}</code>\nTotal Messages: <code>{last_msg_id}</code>\nFile Caption: {caption}\n\nDo you want to forward?", 
-        chat_id=Config.APPROVAL_CNL,
-        reply_markup=InlineKeyboardMarkup(buttons))
+    approval = await message.chat.ask(
+        text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code> Else Send Me "<code>no</code>"'''
+    )
+    if approval.strip() == "yes":
+        if FORWARDING.get(query.from_user.id):
+            return await message.answer('Wait until previous process complete.', show_alert=True)
 
+        msg = message
+        await msg.edit('Starting Forwarding...')
+        try:
+            chat = int(chat)
+        except:
+            chat = chat
+        await forward_files(int(lst_msg_id), chat, msg, bot, query.from_user.id)
+    else:
+        if approval.strip() == "no":
+            return await message.reply("Okay")
+        else:
+            return await message.reply("Invalid reply, Try Again!")
+            
+            
+     
+        
+    
 
 @Client.on_message(filters.private & filters.command(['set_skip']))
 async def set_skip_number(bot, message):
