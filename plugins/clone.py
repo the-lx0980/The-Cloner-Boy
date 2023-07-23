@@ -155,7 +155,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 break
             current += 1
             fetched += 1
-            if current % 20 == 0:
+            if current % 5 == 0:
                 await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
             if message.empty:
                 deleted += 1
@@ -187,7 +187,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                     caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
                 )
             forwarded += 1
-            await asyncio.sleep(random.randint(5, 10))
+            await asyncio.sleep(random.randint(5, 8))
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
