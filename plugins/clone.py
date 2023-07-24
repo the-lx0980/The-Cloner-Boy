@@ -142,6 +142,10 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                                        enums.MessageMediaType.PHOTO]: # Non documents and videos files skipping
                 unsupported += 1
                 continue
+            media = getattr(message, message.media.value, None)
+            if not media:
+                unsupported += 1
+                continue
             try:
                 await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
