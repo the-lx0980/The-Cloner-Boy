@@ -155,7 +155,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 break
             current += 1
             fetched += 1
-            if current % 5 == 0:
+            if current % 20 == 0:
                 await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
             if message.empty:
                 deleted += 1
