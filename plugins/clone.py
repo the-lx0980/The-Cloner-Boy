@@ -7,13 +7,10 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-FILE_CAPTION = Config.FILE_CAPTION
-
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
 FORWARDING = {}
-CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -57,18 +54,6 @@ async def send_for_forward(bot, message):
         target_chat = await bot.get_chat(target_chat_id)
     except Exception as e:
         return await message.reply(f'Error - {e}')
-
-    skip = CURRENT.get(message.from_user.id)
-    if skip:
-        skip = skip
-    else:
-        skip = 0
-
-    caption = CAPTION.get(message.from_user.id)
-    if caption:
-        caption = caption
-    else:
-        caption = FILE_CAPTION
     # last_msg_id is same to total messages
     approval = await message.chat.ask(
         text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code>" Else Send Me "<code>no</code>"'''
@@ -126,17 +111,6 @@ async def set_target_channel(bot, message):
     await message.reply(f"Successfully set {chat.title} target channel.")
 
 
-@Client.on_message(filters.private & filters.command(['set_caption']))
-async def set_caption(bot, message):
-    try:
-        caption = message.text.split(" ", 1)[1]
-    except:
-        return await message.reply("Give me a caption.")
-    CAPTION[message.from_user.id] = caption
-    await message.reply(f"Successfully set file caption.\n\n{caption}")
-    
-    
-    
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
     forwarded = 0
@@ -172,14 +146,14 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
                     file_id=media.file_id,
-                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
-                )
+                    caption=message.caption
+                ) 
             except FloodWait as e:
                 await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
                 await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
                     file_id=media.file_id,
-                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
+                    caption=message.caption 
                 )
             forwarded += 1
             await asyncio.sleep(1)
