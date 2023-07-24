@@ -163,14 +163,10 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             elif not message.media:
                 unsupported += 1
                 continue
-            elif message.media not in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO, enums.MessageMediaType.PHOTO]:  # Non documents and videos files skipping
-                unsupported += 1
-                continue
-            media = getattr(message, message.media.value, None)
-            if not media:
-                unsupported += 1
-                continue
-            elif media.mime_type not in ['video/mp4', 'video/x-matroska']:  # Non mp4 and mkv files types skipping
+            elif message.media not in [enums.MessageMediaType.DOCUMENT, 
+                                       enums.MessageMediaType.VIDEO, 
+                                       enums.MessageMediaType.STICKER,
+                                       enums.MessageMediaType.PHOTO]: # Non documents and videos files skipping
                 unsupported += 1
                 continue
             try:
