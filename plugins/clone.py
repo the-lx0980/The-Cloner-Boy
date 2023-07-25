@@ -45,11 +45,6 @@ async def send_for_forward(bot, message):
 
     if source_chat.type != enums.ChatType.CHANNEL:
         return await message.reply("I can forward only channels.")
-    try:
-        from_chat = f"@{source_chat.username}
-    except:
-        from_chat = source_chat.id
-        pass
 
     target_chat_id = CHANNEL.get(message.from_user.id)
     if not target_chat_id:
@@ -73,7 +68,7 @@ async def send_for_forward(bot, message):
         except:
             chat = chat_id
         lst_msg_id = last_msg_id
-        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id, from_chat)
+        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id)
     else:
         if approval.strip() == "no":
             return await message.reply("Okay")
@@ -116,10 +111,11 @@ async def set_target_channel(bot, message):
     await message.reply(f"Successfully set {chat.title} target channel.")
 
 
-async def forward_files(lst_msg_id, chat, msg, bot, user_id, from_chat_id):
+async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
     forwarded = 0
     deleted = 0
+    unsupported = 0
     fetched = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
@@ -133,26 +129,35 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, from_chat_id):
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\n\n send "<code>cancel</code>" for stop''') 
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
             if message.empty:
                 deleted += 1
                 continue
+            elif not message.media:
+                unsupported += 1
+                continue
+            elif message.media not in [enums.MessageMediaType.DOCUMENT, 
+                                       enums.MessageMediaType.VIDEO, 
+                                       enums.MessageMediaType.STICKER,
+                                       enums.MessageMediaType.PHOTO]: # Non documents and videos files skipping
+                unsupported += 1
+                continue
+            media = getattr(message, message.media.value, None)
+            if not media:
+                unsupported += 1
+                continue
             try:
-                await bot.copy_message(
+                await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
-                    from_chat_id=from_chat_id,
-                    parse_mode=enums.ParseMode.MARKDOWN,       
-                    caption=message.caption,
-                    message_id=message.id
-                )
+                    file_id=media.file_id,
+                    caption=message.caption
+                ) 
             except FloodWait as e:
                 await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                await bot.copy_message(
+                await bot.send_cached_media(
                     chat_id=CHANNEL.get(user_id),
-                    from_chat_id=from_chat_id,
-                    parse_mode=enums.ParseMode.MARKDOWN,       
-                    caption=message.caption,
-                    message_id=message.id
+                    file_id=media.file_id,
+                    caption=message.caption 
                 )
             forwarded += 1
             await asyncio.sleep(1)
@@ -160,7 +165,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, from_chat_id):
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
 
 
