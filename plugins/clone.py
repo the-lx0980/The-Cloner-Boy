@@ -129,30 +129,20 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
             if message.empty:
                 deleted += 1
                 continue
             elif not message.media:
                 unsupported += 1
-                continue
-            elif message.media not in [enums.MessageMediaType.DOCUMENT, 
-                                       enums.MessageMediaType.VIDEO, 
-                                       enums.MessageMediaType.STICKER,
-                                       enums.MessageMediaType.PHOTO]: # Non documents and videos files skipping
-                unsupported += 1
-                continue
             media = getattr(message, message.media.value, None)
-            if not media:
-                unsupported += 1
-                continue
             try:          
                 if message.media:
                     try:
                         await bot.send_cached_media(
                             chat_id=CHANNEL.get(user_id),
                             file_id=media.file_id,
-                        caption=message.caption
+                            caption=message.caption
                         ) 
                     except FloodWait as e:
                         await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
@@ -162,22 +152,30 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                             caption=message.caption 
                         )
                 else:
-                    await bot.copy_message(
-                        chat_id=CHANNEL.get(user_id),
-                        from_chat_id=from_chat,
-                        caption=message.caption,
-                        message_id=message.id
-                        parse_mode=g,
-                    )
-                    
-
+                    try:
+                        await bot.copy_message(
+                            chat_id=CHANNEL.get(user_id),
+                            from_chat_id=chat,
+                            caption=message.caption,
+                            message_id=message.id,
+                            parse_mode=enums.ParseMode.MARKDOWN
+                        )
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)
+                        await bot.copy_message(
+                            chat_id=CHANNEL.get(user_id),
+                            from_chat_id=chat,
+                            caption=message.caption,
+                            message_id=message.id,
+                            parse_mode=enums.ParseMode.MARKDOWN
+                        )                                        
             forwarded += 1
             await asyncio.sleep(1)
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
 
 
