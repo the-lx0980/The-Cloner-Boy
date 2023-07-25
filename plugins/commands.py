@@ -13,12 +13,6 @@ Forward your source channel message to this bot. If source channel is forward re
 
 /set_skip - Set skip message.
 /set_channel - Set target channel.
-/set_caption - Set file caption.
-
-Caption formats:
-`{file_name}` - File name.
-`{file_size}` - File size.
-`{caption}` - Default file caption.
 
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
     await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")

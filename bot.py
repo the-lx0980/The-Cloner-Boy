@@ -8,46 +8,35 @@ logging.getLogger("pyrogram").setLevel(logging.ERROR)
 
 from pyromod import listen
 from pyrogram.raw.all import layer
-from user import User
 from pyrogram import Client
 from pyrogram.enums import ParseMode
 from typing import Union, Optional, AsyncGenerator
 from pyrogram import types
 
-from config import Config, LOGGER
+from config import Config
 
 
 class Bot(Client):
-    USER: User = None
-    USER_ID: int = None
 
     def __init__(self):
         super().__init__(
             name="bot_session",
             api_hash=Config.API_HASH,
             api_id=Config.APP_ID,
-            session_string=Config.TG_USER_SESSION,
-            sleep_threshold=30,
-            workers=8,
-            plugins={
-                "root": "plugins"
-            }
+            bot_token=Config.TG_BOT_TOKEN,
+            sleep_threshold=5,
+            workers=50,
+            plugins={"root": "plugins"}
         )
-        self.LOGGER = LOGGER
 
     async def start(self):
         await super().start()
-        usr_bot_me = await self.get_me()
-        self.set_parse_mode(ParseMode.HTML)
-        self.LOGGER(__name__).info(
-            f"@{usr_bot_me.username}  started! "
-        )
-#        self.USER, self.USER_ID = await User().start()
-
+        me = await self.get_me()
+        logging.info(f"@{me.username} Is Started!")
 
     async def stop(self, *args):
         await super().stop()
-        self.LOGGER(__name__).info("Bot stopped. Bye.")
+        logging.info("Bot stopped. Bye.")
     
     async def iter_messages(self, chat_id: Union[int, str], limit: int, offset: int = 0) -> Optional[AsyncGenerator["types.Message", None]]:
         """Iterate through a chat sequentially.
