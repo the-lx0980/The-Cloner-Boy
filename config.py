@@ -1,5 +1,4 @@
 from os import environ
-import logging
 
 class Config(object):
     TG_BOT_TOKEN = environ.get("TG_BOT_TOKEN", "")
