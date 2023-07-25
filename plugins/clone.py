@@ -146,19 +146,31 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             if not media:
                 unsupported += 1
                 continue
-            try:
-                await bot.send_cached_media(
-                    chat_id=CHANNEL.get(user_id),
-                    file_id=media.file_id,
-                    caption=message.caption
-                ) 
-            except FloodWait as e:
-                await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                await bot.send_cached_media(
-                    chat_id=CHANNEL.get(user_id),
-                    file_id=media.file_id,
-                    caption=message.caption 
-                )
+            try:          
+                if message.media:
+                    try:
+                        await bot.send_cached_media(
+                            chat_id=CHANNEL.get(user_id),
+                            file_id=media.file_id,
+                        caption=message.caption
+                        ) 
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                        await bot.send_cached_media(
+                            chat_id=CHANNEL.get(user_id),
+                            file_id=media.file_id,
+                            caption=message.caption 
+                        )
+                else:
+                    await bot.copy_message(
+                        chat_id=CHANNEL.get(user_id),
+                        from_chat_id=from_chat,
+                        caption=message.caption,
+                        message_id=message.id
+                        parse_mode=g,
+                    )
+                    
+
             forwarded += 1
             await asyncio.sleep(1)
     except Exception as e:
