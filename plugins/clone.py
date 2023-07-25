@@ -169,14 +169,14 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
                         )
-                forwarded += 1
-                await asyncio.sleep(1)
-            except Exception as e:
-                logger.exception(e)
-                await msg.reply(f"Forward Canceled!\n\nError - {e}")
-        else:
-            await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
-    finally:
+
+            forwarded += 1
+            await asyncio.sleep(1)
+    except Exception as e:
+        logger.exception(e)
+        await msg.reply(f"Forward Canceled!\n\nError - {e}")
+    else:
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
 
 
