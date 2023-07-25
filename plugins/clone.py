@@ -46,7 +46,7 @@ async def send_for_forward(bot, message):
     if source_chat.type != enums.ChatType.CHANNEL:
         return await message.reply("I can forward only channels.")
     try:
-        from_chat = source_chat.username 
+        from_chat = f"@{source_chat.username}
     except:
         from_chat = source_chat.id
         pass
