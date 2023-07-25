@@ -129,27 +129,27 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
             if message.empty:
                 deleted += 1
                 continue
             elif not message.media:
                 unsupported += 1
             media = getattr(message, message.media.value, None)
-            try:          
+            try:
                 if message.media:
                     try:
                         await bot.send_cached_media(
                             chat_id=CHANNEL.get(user_id),
                             file_id=media.file_id,
                             caption=message.caption
-                        ) 
+                        )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
                         await bot.send_cached_media(
                             chat_id=CHANNEL.get(user_id),
                             file_id=media.file_id,
-                            caption=message.caption 
+                            caption=message.caption
                         )
                 else:
                     try:
@@ -168,15 +168,17 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                             caption=message.caption,
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
-                        )                                        
-            forwarded += 1
-            await asyncio.sleep(1)
-    except Exception as e:
-        logger.exception(e)
-        await msg.reply(f"Forward Canceled!\n\nError - {e}")
-    else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
+                        )
+                forwarded += 1
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.exception(e)
+                await msg.reply(f"Forward Canceled!\n\nError - {e}")
+        else:
+            await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
+    finally:
         FORWARDING[user_id] = False
+
 
 
 def get_size(size):
