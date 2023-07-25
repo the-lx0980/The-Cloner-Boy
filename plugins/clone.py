@@ -133,24 +133,28 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             if message.empty:
                 deleted += 1
                 continue
-            elif not message.media:
-                unsupported += 1
-            media = getattr(message, message.media.value, None)
             try:
                 if message.media:
-                    try:
-                        await bot.send_cached_media(
-                            chat_id=CHANNEL.get(user_id),
-                            file_id=media.file_id,
-                            caption=message.caption
-                        )
-                    except FloodWait as e:
-                        await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                        await bot.send_cached_media(
-                            chat_id=CHANNEL.get(user_id),
-                            file_id=media.file_id,
-                            caption=message.caption
-                        )
+                     if message.media in [enums.MessageMediaType.DOCUMENT, 
+                                          enums.MessageMediaType.VIDEO, 
+                                          enums.MessageMediaType.STICKER,
+                                          enums.MessageMediaType.PHOTO]:]
+                       
+                        media = getattr(message, message.media.value, None)
+                        if media:
+                            try:
+                                await bot.send_cached_media(
+                                    chat_id=CHANNEL.get(user_id),
+                                    file_id=media.file_id,
+                                    caption=message.caption
+                                )
+                            except FloodWait as e:
+                                await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                                await bot.send_cached_media(
+                                    chat_id=CHANNEL.get(user_id),
+                                    file_id=media.file_id,
+                                    caption=message.caption
+                                )
                 else:
                     try:
                         await bot.copy_message(
