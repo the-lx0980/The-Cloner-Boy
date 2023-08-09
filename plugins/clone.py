@@ -1,6 +1,7 @@
 import asyncio
 import re 
 import logging
+from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
