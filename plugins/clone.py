@@ -135,6 +135,14 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 continue
             try:
                 if message.media:
+                    if message.media not in [
+                        MessageMediaType.PHOTO,
+                        MessageMediaType.DOCUMENT,
+                        MessageMediaType.AUDIO,
+                        MessageMediaType.STICKER,
+                        MessageMediaType.WEB_PAGE,
+                        MessageMediaType.VIDEO]:
+                        continue 
                     media = getattr(message, message.media.value, None)
                     if media:
                         try:
