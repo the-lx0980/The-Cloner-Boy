@@ -44,8 +44,8 @@ async def send_for_forward(bot, message):
     except Exception as e:
         return await message.reply(f'Error - {e}')
 
-    if source_chat.type != enums.ChatType.CHANNEL:
-        return await message.reply("I can forward only channels.")
+    if source_chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.GROUP]:
+        return await message.reply("I can forward only channels and groups.")
 
     target_chat_id = CHANNEL.get(message.from_user.id)
     if not target_chat_id:
