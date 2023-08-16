@@ -141,7 +141,6 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                         MessageMediaType.DOCUMENT,
                         MessageMediaType.AUDIO,
                         MessageMediaType.STICKER,
-                        MessageMediaType.WEB_PAGE,
                         MessageMediaType.VIDEO]:
                         continue 
                     media = getattr(message, message.media.value, None)
@@ -188,14 +187,3 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     else:
         await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
-
-
-
-def get_size(size):
-    units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"]
-    size = float(size)
-    i = 0
-    while size >= 1024.0 and i < len(units):
-        i += 1
-        size /= 1024.0
-    return "%.2f %s" % (size, units[i])
