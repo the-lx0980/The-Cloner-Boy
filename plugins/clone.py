@@ -129,7 +129,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 await msg.edit(f"Successfully Forward Canceled!")
                 FORWARDING[user_id] = False 
                 break
-            if forwarded == 800:
+            if forwarded == 500:
                 await msg.edit(f"Forward stopped! You Reached Max Limit\n<b>Message ID</b>: <code>{message.id}</code>\n<b>Forwarded</b>: <code>{forwarded}</code>")
                 FORWARDING[user_id] = False 
                 break
@@ -204,7 +204,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
             forwarded += 1
-            await asyncio.sleep(1)            
+            await asyncio.sleep(4)            
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
