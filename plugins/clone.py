@@ -150,7 +150,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             else:
                 search_text = message.video.file_name if message.video.file_name else message.document.file_name
             file_name = False    
-            async for msg in client.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
+            async for msg in bot.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
                 if msg.caption:
                     file_name = True
                 elif file_n == 'video':
