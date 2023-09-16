@@ -127,6 +127,11 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
         async for message in bot.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
             if CANCEL.get(user_id):
                 await msg.edit(f"Successfully Forward Canceled!")
+                FORWARDING[user_id] = False 
+                break
+            if forwarded == 800:
+                await msg.edit(f"Forward stopped! You Reached Max Limit\n<b>Message ID</b>: <code>{message.id}</code>\n<b>Forwarded</b>: <code>{forwarded}</code>")
+                FORWARDING[user_id] = False 
                 break
             current += 1
             fetched += 1
