@@ -151,13 +151,13 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             else:
                 search_text = message.video.file_name if message.video.file_name else message.document.file_name
             file_name = False    
-            async for msg in bot.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
-                if msg.caption:
+            async for msg_s in bot.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
+                if msg_s.caption:
                     file_name = True
                 elif file_n == 'video':
-                    file_name = msg.video.file_name
+                    file_name = msg_s.video.file_name
                 else:
-                    file_name = msg.document.file_name    
+                    file_name = msg_s.document.file_name    
             if file_name:
                 duplicate += 1
                 continue             
