@@ -118,6 +118,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     deleted = 0
     unsupported = 0
     fetched = 0
+    duplicate = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
     # lst_msg_id is same to total messages
@@ -158,6 +159,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 else:
                     file_name = msg.document.file_name    
             if file_name:
+                duplicate += 1
                 continue             
             try:         
                 media = getattr(message, message.media.value, None)
@@ -202,5 +204,5 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
         FORWARDING[user_id] = False
