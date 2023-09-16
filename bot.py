@@ -27,7 +27,6 @@ class Bot(Client):
             workers=8,
             plugins={"root": "plugins"}
         )
-        self.LOGGER = LOGGER
 
     async def start(self):
         await super().start()
