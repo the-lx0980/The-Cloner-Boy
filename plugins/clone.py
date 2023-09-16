@@ -1,7 +1,7 @@
 import asyncio
 import re 
 import logging
-from pyrogram.enums import MessageMediaType
+from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
@@ -134,30 +134,47 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             if message.empty:
                 deleted += 1
                 continue
-            try:
-                if message.media:
-                    if message.media not in [
-                        MessageMediaType.PHOTO,
-                        MessageMediaType.DOCUMENT,
-                        MessageMediaType.AUDIO,
-                        MessageMediaType.STICKER,
-                        MessageMediaType.VIDEO]:
-                        continue 
-                    media = getattr(message, message.media.value, None)
-                    if media:
-                        try:
-                            await bot.send_cached_media(
+            if not message.media:
+                continue
+            if message.media not in [MessageMediaType.DOCUMENT, MessageMediaType.VIDEO]:
+                continue
+            btn = []
+            if message.media == MessageMediaType.VIDEO:
+                media_type = MessagesFilter.VIDEO
+                file_n = 'video'
+            else:
+                media_type = MessagesFilter.DOCUMENT  
+                file_n = 'document'
+            if message.caption:
+                search_text = message.caption
+            else:
+                search_text = message.video.file_name if message.video.file_name else message.document.file_name
+            file_name = False    
+            async for msg in client.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
+                if msg.caption:
+                    file_name = True
+                elif file_n == 'video':
+                    file_name = msg.video.file_name
+                else:
+                    file_name = msg.document.file_name    
+            if file_name:
+                continue             
+            try:         
+                media = getattr(message, message.media.value, None)
+                if media:
+                    try:
+                        await bot.send_cached_media(
+                            chat_id=CHANNEL.get(user_id),
+                            file_id=media.file_id,
+                            caption=message.caption
+                        )
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                        await bot.send_cached_media(
                                 chat_id=CHANNEL.get(user_id),
                                 file_id=media.file_id,
                                 caption=message.caption
-                            )
-                        except FloodWait as e:
-                            await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                            await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
-                                file_id=media.file_id,
-                                caption=message.caption
-                            )
+                        )
                 else:
                     try:
                         await bot.copy_message(
