@@ -17,17 +17,17 @@ from config import Config
 
 
 class Bot(Client):
-
     def __init__(self):
         super().__init__(
             name="bot_session",
             api_hash=Config.API_HASH,
             api_id=Config.APP_ID,
-            bot_token=Config.TG_BOT_TOKEN,
-            sleep_threshold=5,
-            workers=50,
+            session_string=Config.TG_USER_SESSION,
+            sleep_threshold=30,
+            workers=8,
             plugins={"root": "plugins"}
         )
+        self.LOGGER = LOGGER
 
     async def start(self):
         await super().start()
