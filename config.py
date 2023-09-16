@@ -1,5 +1,4 @@
 from os import environ
-import logging
 
 class Config(object):
     TG_BOT_TOKEN = environ.get("TG_BOT_TOKEN", "")
@@ -9,5 +8,3 @@ class Config(object):
     FILE_CAPTION = environ.get('FILE_CAPTION', '<code>{file_name}</code>')
     ADMINS = [x.strip("@ ") for x in str(environ.get("ADMINS", "") or "").split(",") if x.strip("@ ")]
     
-def LOGGER(name: str) -> logging.Logger:
-    return logging.getLogger(name)

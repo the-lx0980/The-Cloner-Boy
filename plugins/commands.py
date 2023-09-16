@@ -1,6 +1,9 @@
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from config import Config as a
+import asyncio
+import sys
+import os
 
 
 @Client.on_message(filters.private & (filters.command("start") | filters.regex("start")) & filters.incoming)
@@ -13,16 +16,21 @@ Forward your source channel message to this bot. If source channel is forward re
 
 /set_skip - Set skip message.
 /set_channel - Set target channel.
-/set_caption - Set file caption.
-
-Caption formats:
-`{file_name}` - File name.
-`{file_size}` - File size.
-`{caption}` - Default file caption.
 
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
     await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")
 
+@Client.on_message(filters.command("stop"))
+async def stop_button(bot, m):
+    if a.ADMINS and not ((str(m.from_user.id) in a.ADMINS) or (m.from_user.username in a.ADMINS)):
+        return
+    msg = await bot.send_message(
+        text="Stoping all processes...",
+        chat_id=m.chat.id
+    )
+    await asyncio.sleep(1)
+    await msg.edit("All Processes Stopped and Restarted")
+    os.execl(sys.executable, sys.executable, *sys.argv)
 
 @Client.on_message(filters.command('id'))
 async def showid(client, message):

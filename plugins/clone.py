@@ -1,20 +1,17 @@
 import asyncio
-import re
-import random 
+import re 
 import logging
+from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
 
 logger = logging.getLogger(__name__)
 
-FILE_CAPTION = Config.FILE_CAPTION
-
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
 FORWARDING = {}
-CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -36,7 +33,7 @@ async def send_for_forward(bot, message):
         last_msg_id = int(match.group(5))
         if chat_id.isnumeric():
             chat_id  = int(("-100" + chat_id))
-    elif message.forward_from_chat.type == enums.ChatType.CHANNEL:
+    elif message.forward_from_chat.type in [enums.ChatType.CHANNEL, enums.ChatType.GROUP]:
         last_msg_id = message.forward_from_message_id
         chat_id = message.forward_from_chat.username or message.forward_from_chat.id
     else:
@@ -47,8 +44,8 @@ async def send_for_forward(bot, message):
     except Exception as e:
         return await message.reply(f'Error - {e}')
 
-    if source_chat.type != enums.ChatType.CHANNEL:
-        return await message.reply("I can forward only channels.")
+    if source_chat.type not in [enums.ChatType.CHANNEL, enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
+        return await message.reply("I can forward only channels and groups.")
 
     target_chat_id = CHANNEL.get(message.from_user.id)
     if not target_chat_id:
@@ -58,18 +55,6 @@ async def send_for_forward(bot, message):
         target_chat = await bot.get_chat(target_chat_id)
     except Exception as e:
         return await message.reply(f'Error - {e}')
-
-    skip = CURRENT.get(message.from_user.id)
-    if skip:
-        skip = skip
-    else:
-        skip = 0
-
-    caption = CAPTION.get(message.from_user.id)
-    if caption:
-        caption = caption
-    else:
-        caption = FILE_CAPTION
     # last_msg_id is same to total messages
     approval = await message.chat.ask(
         text = f'''Do You Want Forward? If You Want Forward Send Me "<code>yes</code>" Else Send Me "<code>no</code>"'''
@@ -127,17 +112,6 @@ async def set_target_channel(bot, message):
     await message.reply(f"Successfully set {chat.title} target channel.")
 
 
-@Client.on_message(filters.private & filters.command(['set_caption']))
-async def set_caption(bot, message):
-    try:
-        caption = message.text.split(" ", 1)[1]
-    except:
-        return await message.reply("Give me a caption.")
-    CAPTION[message.from_user.id] = caption
-    await message.reply(f"Successfully set file caption.\n\n{caption}")
-    
-    
-    
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
     forwarded = 0
@@ -155,52 +129,61 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 break
             current += 1
             fetched += 1
-            if current % 5 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''') 
+            if current % 20 == 0:
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
             if message.empty:
                 deleted += 1
                 continue
-            elif not message.media:
-                unsupported += 1
-                continue
-            elif message.media not in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO]:  # Non documents and videos files skipping
-                unsupported += 1
-                continue
-            media = getattr(message, message.media.value, None)
-            if not media:
-                unsupported += 1
-                continue
-            elif media.mime_type not in ['video/mp4', 'video/x-matroska']:  # Non mp4 and mkv files types skipping
-                unsupported += 1
-                continue
             try:
-                await bot.send_cached_media(
-                    chat_id=CHANNEL.get(user_id),
-                    file_id=media.file_id,
-                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
-                )
-            except FloodWait as e:
-                await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                await bot.send_cached_media(
-                    chat_id=CHANNEL.get(user_id),
-                    file_id=media.file_id,
-                    caption=CAPTION.get(user_id).format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption) if CAPTION.get(user_id) else FILE_CAPTION.format(file_name=media.file_name, file_size=get_size(media.file_size), caption=message.caption)
-                )
+                if message.media:
+                    if message.media not in [
+                        MessageMediaType.PHOTO,
+                        MessageMediaType.DOCUMENT,
+                        MessageMediaType.AUDIO,
+                        MessageMediaType.STICKER,
+                        MessageMediaType.VIDEO]:
+                        continue 
+                    media = getattr(message, message.media.value, None)
+                    if media:
+                        try:
+                            await bot.send_cached_media(
+                                chat_id=CHANNEL.get(user_id),
+                                file_id=media.file_id,
+                                caption=message.caption
+                            )
+                        except FloodWait as e:
+                            await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                            await bot.send_cached_media(
+                                chat_id=CHANNEL.get(user_id),
+                                file_id=media.file_id,
+                                caption=message.caption
+                            )
+                else:
+                    try:
+                        await bot.copy_message(
+                            chat_id=CHANNEL.get(user_id),
+                            from_chat_id=chat,
+                            caption=message.caption,
+                            message_id=message.id,
+                            parse_mode=enums.ParseMode.MARKDOWN
+                        )
+                    except FloodWait as e:
+                        await asyncio.sleep(e.value)
+                        await bot.copy_message(
+                            chat_id=CHANNEL.get(user_id),
+                            from_chat_id=chat,
+                            caption=message.caption,
+                            message_id=message.id,
+                            parse_mode=enums.ParseMode.MARKDOWN
+                        )
+            except Exception as e:
+                logger.exception(e)
+                return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
             forwarded += 1
-            await asyncio.sleep(random.randint(5, 8))
+            await asyncio.sleep(1)            
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nUnsupported Files Skipped: <code>{unsupported}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
-
-
-def get_size(size):
-    units = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB"]
-    size = float(size)
-    i = 0
-    while size >= 1024.0 and i < len(units):
-        i += 1
-        size /= 1024.0
-    return "%.2f %s" % (size, units[i])
