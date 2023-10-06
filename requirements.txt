@@ -2,6 +2,6 @@ pyrogram==2.0.106
 tgcrypto==1.2.5
 https://github.com/the-lx0980/pyromod/archive/refs/heads/master.zip
 
-Flask==2.2.2
-gunicorn==20.1.0
-aiohttp==3.8.1
+Flask==3.0.0
+gunicorn==21.2.0
+aiohttp==3.8.4
