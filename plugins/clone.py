@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
+DELAY = {}
 FORWARDING = {}
 
 @Client.on_message(filters.regex('cancel'))
@@ -90,6 +91,18 @@ async def set_skip_number(bot, message):
     CURRENT[message.from_user.id] = int(skip)
     await message.reply(f"Successfully set <code>{skip}</code> skip number.")
 
+@Client.on_message(filters.private & filters.command(['set_delay'])) delay 
+async def set_delay_number(bot, message):
+    try:
+        _, delay = message.text.split(" ")
+    except:
+        return await message.reply("Give me a delay in seconds.")
+    try:
+        delay = int(delay)
+    except:
+        return await message.reply("Only support in numbers.")
+    DELAY[message.from_user.id] = int(delay)
+    await message.reply(f"Successfully set <code>{delay}</code> delay in second.")
 
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
@@ -114,6 +127,7 @@ async def set_target_channel(bot, message):
 
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+    delay = DELAY.get(user_id) if DELAY.get(user_id) else 0
     forwarded = 0
     deleted = 0
     unsupported = 0
@@ -180,7 +194,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
             forwarded += 1
-            await asyncio.sleep(1)            
+            await asyncio.sleep(delay)            
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
