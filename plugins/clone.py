@@ -127,7 +127,7 @@ async def set_target_channel(bot, message):
 
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
-    delay = DELAY.get(user_id) if DELAY.get(user_id) else 0
+    delay = DELAY.get(user_id) if DELAY.get(user_id) else 1
     forwarded = 0
     deleted = 0
     unsupported = 0
