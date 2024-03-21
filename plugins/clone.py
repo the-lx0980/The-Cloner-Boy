@@ -91,7 +91,7 @@ async def set_skip_number(bot, message):
     CURRENT[message.from_user.id] = int(skip)
     await message.reply(f"Successfully set <code>{skip}</code> skip number.")
 
-@Client.on_message(filters.private & filters.command(['set_delay'])) delay 
+@Client.on_message(filters.private & filters.command(['set_delay'])) 
 async def set_delay_number(bot, message):
     try:
         _, delay = message.text.split(" ")
