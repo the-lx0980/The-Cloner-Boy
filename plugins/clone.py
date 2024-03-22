@@ -177,7 +177,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                         await bot.copy_message(
                             chat_id=CHANNEL.get(user_id),
                             from_chat_id=chat,
-                            caption=message.caption,
+                            caption='**{message.caption}**',
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
                         )
@@ -186,7 +186,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                         await bot.copy_message(
                             chat_id=CHANNEL.get(user_id),
                             from_chat_id=chat,
-                            caption=message.caption,
+                            caption='**{message.caption}**',
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
                         )
