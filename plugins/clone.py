@@ -136,7 +136,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>\n\n send "<code>cancel</code>" for stop''')
             if message.empty:
                 deleted += 1
                 continue
@@ -156,7 +156,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             else:
                 search_text = message.video.file_name if message.video.file_name else message.document.file_name
             file_name = False    
-            async for msg_s in bot.search_messages(CHANNEL.get(user_id),query=search_text,filter=media_type):       
+            async for msg_s in bot.search_messages(-1002022867287,query=search_text,filter=media_type):       
                 if msg_s.caption:
                     file_name = True
                 elif file_n == 'video':
