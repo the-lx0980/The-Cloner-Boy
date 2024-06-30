@@ -5,6 +5,7 @@ from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
+from utils import extract_movie_details
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,8 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 search_text = message.caption
             else:
                 search_text = message.video.file_name if message.video.file_name else message.document.file_name
+            name, year, quality = extract_movie_details(search_text)
+            search_text = f"{name} {year} {quality}"
             file_name = False    
             async for msg_s in bot.search_messages(-1002022867287,query=search_text,filter=media_type):       
                 if msg_s.caption:
