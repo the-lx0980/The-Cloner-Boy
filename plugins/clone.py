@@ -33,11 +33,6 @@ async def send_msg(bot, message):
         chat_id = int(chat_id)
     except:
         return await message.reply("Give me a valid ID")
-
-    try:
-        chat = await bot.get_chat(chat_id)
-    except:
-        return await message.reply("Make me a admin in your target channel or make me a member")
     await bot.send_message(
         text = "Dune",
         chat_id = chat_id
