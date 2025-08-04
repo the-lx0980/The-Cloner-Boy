@@ -20,7 +20,30 @@ async def cancel_forward(bot, message):
         await cancel.edit("Successfully Forward Canceled!")
     else:
         await cancel.edit("No Forward Countinue Currently!")
-        
+
+@Client.on_message(filters.private & filters.command(['send']))
+async def send_msg(bot, message):    
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
+    try:
+        _, chat_id = message.text.split(" ")
+    except:
+        return await message.reply("Give me a source channel ID to send msg")
+    try:
+        chat_id = int(chat_id)
+    except:
+        return await message.reply("Give me a valid ID")
+
+    try:
+        chat = await bot.get_chat(chat_id)
+    except:
+        return await message.reply("Make me a admin in your target channel or make me a member")
+    await bot.send_message(
+        text = "Dune",
+        chat_id = chat_id
+    )
+    await message.reply('Message send to source chat successfully')
+
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
     if message.text:
