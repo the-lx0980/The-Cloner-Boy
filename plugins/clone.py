@@ -24,18 +24,10 @@ async def cancel_forward(bot, message):
 @Client.on_message(filters.private & filters.command(['send']))
 async def send_msg(bot, message):    
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
-        return await message.reply("You Are Not Allowed To Use This UserBot")
-    try:
-        _, chat_id = message.text.split(" ")
-    except:
-        return await message.reply("Give me a source channel ID to send msg")
-    try:
-        chat_id = int(chat_id)
-    except:
-        return await message.reply("Give me a valid ID")
+        return await message.reply("You Are Not Allowed To Use This UserBot") 
     await bot.send_message(
         text = "Dune",
-        chat_id = chat_id
+        chat_id = -1002268099451
     )
     await message.reply('Message send to source chat successfully')
 
