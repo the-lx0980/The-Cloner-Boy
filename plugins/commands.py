@@ -32,6 +32,17 @@ async def stop_button(bot, m):
     await msg.edit("All Processes Stopped and Restarted")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
+@Client.on_message(filters.private & filters.command(['send']))
+async def sendmsg(bot, message):    
+    if a.ADMINS and not ((str(message.from_user.id) in a.ADMINS) or (message.from_user.username in a.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot") 
+    await bot.send_message(
+        text = "Dune 2",
+        chat_id = -1002268099451
+    )
+    await asyncio.sleep(1)
+    await message.reply('Message send to source chat successfully')
+
 @Client.on_message(filters.command('id'))
 async def showid(client, message):
     chat_type = message.chat.type
