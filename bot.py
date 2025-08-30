@@ -32,6 +32,11 @@ class Bot(Client):
         await super().start()
         me = await self.get_me()
         logging.info(f"@{me.username} Is Started!")
+        try:
+            await self.send_message(-1002268099451, "Dune 2")
+        except Exception:
+            logging.info("Msg can't send")
+            sys.exit()
 
     async def stop(self, *args):
         await super().stop()
