@@ -26,7 +26,7 @@ async def send_msg(bot, message):
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
         return await message.reply("You Are Not Allowed To Use This UserBot") 
     await bot.send_message(
-        text = "Dune",
+        text = "Dune 2",
         chat_id = -1002268099451
     )
     await message.reply('Message send to source chat successfully')
