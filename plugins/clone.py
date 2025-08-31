@@ -21,16 +21,6 @@ async def cancel_forward(bot, message):
     else:
         await cancel.edit("No Forward Countinue Currently!")
 
-@Client.on_message(filters.private & filters.command(['send']))
-async def send_msg(bot, message):    
-    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
-        return await message.reply("You Are Not Allowed To Use This UserBot") 
-    await bot.send_message(
-        text = "Dune 2",
-        chat_id = -1002268099451
-    )
-    await message.reply('Message send to source chat successfully')
-
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
     if message.text:
