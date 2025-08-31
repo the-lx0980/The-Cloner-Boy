@@ -1,4 +1,4 @@
-https://github.com/ishwar0980/pyrogram/archive/refs/heads/dev.zip
+pyrogram==2.0.106
 tgcrypto==1.2.5
 https://github.com/the-lx0980/pyromod/archive/refs/heads/master.zip
 
