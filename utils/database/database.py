@@ -7,7 +7,10 @@ logger = logging.getLogger(__name__)
 # MongoDB Connection Setup
 # -------------------------------
 try:
-    client = MongoClient("mongodb+srv://kareem9075:C93PrxDdIQrtStxB@cluster0.j2xlpdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", serverSelectionTimeoutMS=5000)
+    client = MongoClient(
+        "mongodb+srv://kareem9075:C93PrxDdIQrtStxB@cluster0.j2xlpdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0",
+        serverSelectionTimeoutMS=5000
+    )
     db = client["media_db"]
     collection = db["media_info"]
     client.server_info()  # test connection
@@ -20,19 +23,15 @@ except Exception as e:
 # ====================================================
 # 🧠 COMMON HELPERS
 # ====================================================
-
 def normalize_title(title: str) -> str:
-    """Normalize title for consistent storage."""
     return title.strip().lower()
 
 
 # ====================================================
 # 🎬 MOVIE FUNCTIONS
 # ====================================================
-
 def get_movie_year(title: str) -> int | None:
-    """Fetch movie release year from MongoDB."""
-    if not collection:
+    if collection is None:
         return None
 
     title = normalize_title(title)
@@ -41,8 +40,7 @@ def get_movie_year(title: str) -> int | None:
 
 
 def save_movie_year(title: str, year: int):
-    """Save or update a movie's release year."""
-    if not collection:
+    if collection is None:
         return
 
     title = normalize_title(title)
@@ -60,10 +58,8 @@ def save_movie_year(title: str, year: int):
 # ====================================================
 # 📺 SERIES FUNCTIONS
 # ====================================================
-
 def get_series_year(title: str, season: int) -> int | None:
-    """Fetch series release year (per season) from MongoDB."""
-    if not collection:
+    if collection is None:
         return None
 
     title = normalize_title(title)
@@ -72,8 +68,7 @@ def get_series_year(title: str, season: int) -> int | None:
 
 
 def save_series_year(title: str, season: int, year: int):
-    """Save or update a series' release year (per season)."""
-    if not collection:
+    if collection is None:
         return
 
     title = normalize_title(title)
@@ -91,10 +86,8 @@ def save_series_year(title: str, season: int, year: int):
 # ====================================================
 # 🧾 UTILS
 # ====================================================
-
 def list_all_media():
-    """List all stored movies and series."""
-    if not collection:
+    if collection is None:
         print("⚠️ No MongoDB connection.")
         return []
 
@@ -108,8 +101,7 @@ def list_all_media():
 
 
 def delete_media(title: str, season: int | None = None):
-    """Delete specific movie or series record."""
-    if not collection:
+    if collection is None:
         return
 
     title = normalize_title(title)
