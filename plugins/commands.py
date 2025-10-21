@@ -10,7 +10,6 @@ import os
 async def start(_, m):
     if a.ADMINS and not ((str(m.from_user.id) in a.ADMINS) or (m.from_user.username in a.ADMINS)):
         return 
-
     text = f"""
 👋 Hello {m.from_user.first_name}!
 
@@ -26,7 +25,6 @@ I can forward **documents** and **videos** (mp4/mkv) from a source channel to yo
 
 ⚠️ Note: Your settings are temporary. If the bot restarts, forwarding stops and settings are lost.
 """
-
     await m.reply(text)
     
 @Client.on_message(filters.command("stop"))
