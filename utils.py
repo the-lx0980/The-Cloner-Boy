@@ -1,114 +1,115 @@
-import os
+import time
 import asyncio
 import logging
 from itertools import cycle
+from openai import OpenAI
 import openai
 from pyrogram.errors import FloodWait
 from pyrogram import enums
 
-logging.basicConfig(
-    format="%(asctime)s - [AI-CAPTION] - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
-logger = logging.getLogger("AICaptionExtractor")
+logger = logging.getLogger(__name__)
 
-keys = os.environ.get("OPENAI_API_KEYS") or os.environ.get("OPENAI_API_KEY")
-
+# Load API keys
+keys = os.environ.get("OPENAI_API_KEYS")
 if not keys:
-    raise Exception("❌ No OpenAI API keys found. Set OPENAI_API_KEYS or OPENAI_API_KEY in environment.")
+    raise Exception("No OpenAI API keys found in environment.")
 
 OPENAI_API_KEYS = [k.strip() for k in keys.split(",") if k.strip()]
 if not OPENAI_API_KEYS:
-    raise Exception("❌ No valid API keys found.")
+    raise Exception("No valid API keys found.")
 
-if len(OPENAI_API_KEYS) == 1:
-    _ai_client = openai.OpenAI(api_key=OPENAI_API_KEYS[0])
+# Round-robin client cycle
+_clients = [OpenAI(api_key=k) for k in OPENAI_API_KEYS]
+_client_cycle = cycle(_clients)
 
-    def get_ai_client() -> openai.OpenAI:
-        """Return the single pre-initialized OpenAI client."""
-        return _ai_client
-    logger.info("🔑 Single API key mode enabled.")
-else:
-    _ai_clients = [openai.OpenAI(api_key=k) for k in OPENAI_API_KEYS]
-    _client_cycle = cycle(_ai_clients)
+# Per-key cooldown tracker
+_key_cooldowns = {c.api_key: 0 for c in _clients}
 
-    def get_ai_client() -> openai.OpenAI:
-        """Return the next OpenAI client (round-robin rotation)."""
-        return next(_client_cycle)
-    logger.info(f"🔁 Multi-key rotation enabled ({len(OPENAI_API_KEYS)} keys).")
+# Async lock (to avoid concurrent rotation issues)
+_ai_lock = asyncio.Lock()
+
+# Model fallback priority
+MODEL_PRIORITY = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"]
+
+
+def _next_client() -> OpenAI:
+    """Return next available client skipping cooldown keys."""
+    now = time.time()
+    for _ in range(len(_clients)):
+        client = next(_client_cycle)
+        if now >= _key_cooldowns[client.api_key]:
+            return client
+    logger.warning("⚠️ All API keys on cooldown, waiting 30s...")
+    time.sleep(30)
+    return next(_client_cycle)
+
+
+async def get_ai_client() -> OpenAI:
+    """Thread-safe client getter."""
+    async with _ai_lock:
+        return _next_client()
+
 
 async def extract_caption_ai(caption: str) -> str:
-    """
-    Clean and format captions for movies or series using OpenAI.
-    Returns the formatted caption or original caption if AI fails.
-    """
+    """Format movie/series captions using OpenAI with auto key & model rotation."""
     if not caption or len(caption.strip()) < 3:
-        logger.debug("🟡 Skipped empty/short caption for AI processing.")
+        logger.debug("🟡 Skipped empty caption.")
         return caption
 
-    ai = get_ai_client()
     prompt = f"""
-You are a highly accurate movie and series caption formatter.
+You are a professional movie/series caption formatter.
+Format cleanly without emojis or extra punctuation.
 
-Rules:
-- Detect movie/series.
-- Format neatly, no emojis.
-- Return only text.
-
-Input caption:
+Input:
 {caption}
 """
 
-    for attempt in range(3):
+    model_index = 0  # Start with the highest priority model
+
+    for attempt in range(6):
+        client = await get_ai_client()
+        model = MODEL_PRIORITY[model_index]
         try:
-            logger.info(f"🧠 Sending caption to AI (attempt {attempt + 1})")
-            response = ai.chat.completions.create(
-                model="gpt-4o-mini",
+            logger.info(f"🧠 Sending to {model} (attempt {attempt + 1})")
+
+            response = client.chat.completions.create(
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=20,
+                max_retries=0,
             )
             formatted = response.choices[0].message.content.strip()
-            logger.info("✅ Caption formatted successfully.")
+            logger.info(f"✅ Caption formatted with {model}.")
             return formatted
 
-        except FloodWait as e:
-            logger.warning(f"⚠️ FloodWait: sleeping {e.value}s before retry.")
-            await asyncio.sleep(e.value)
-
         except openai.RateLimitError as e:
-            logger.warning(f"🚫 Rate limit reached: {e.message}. Rotating key...")
-            ai = get_ai_client()
-            await asyncio.sleep(2)
+            msg = getattr(e, "message", str(e))
+            logger.warning(f"🚫 Rate limit: {msg}. Cooling down key...")
+            _key_cooldowns[client.api_key] = time.time() + 120
+            await asyncio.sleep(1)
 
-        except openai.AuthenticationError as e:
-            logger.error(f"❌ Invalid API key: {e.message}. Switching key.")
-            ai = get_ai_client()
+        except openai.AuthenticationError:
+            logger.error("❌ Invalid key — disabling for 10 minutes.")
+            _key_cooldowns[client.api_key] = time.time() + 600
 
-        except openai.PermissionDeniedError as e:
-            logger.error(f"🚷 Permission denied: {e.message}. Rotating key.")
-            ai = get_ai_client()
-
-        except openai.APIConnectionError as e:
-            logger.warning(f"🌐 Connection error: {e}. Retrying...")
+        except openai.APIConnectionError:
+            logger.warning("🌐 Connection error. Retrying in 3s...")
             await asyncio.sleep(3)
 
-        except openai.InternalServerError as e:
-            logger.warning(f"🧩 Internal server error: {e.message}. Retrying...")
+        except openai.InternalServerError:
+            logger.warning("🧩 Internal server error. Retrying in 3s...")
             await asyncio.sleep(3)
-
-        except openai.ServiceUnavailableError as e:
-            logger.warning(f"🕒 Service unavailable: {e.message}. Retrying...")
-            await asyncio.sleep(3)
-
-        except openai.BadRequestError as e:
-            logger.error(f"⚠️ Bad request: {e.message}")
-            break
 
         except Exception as e:
-            logger.exception(f"❌ Unexpected AI Caption Error: {e}")
+            logger.exception(f"❌ Unexpected AI error: {e}")
             await asyncio.sleep(2)
 
-    logger.warning("⚠️ AI formatting failed after retries. Using original caption.")
+        # If repeated errors, fallback model
+        if attempt in (2, 4) and model_index + 1 < len(MODEL_PRIORITY):
+            model_index += 1
+            logger.warning(f"🔁 Switching fallback model → {MODEL_PRIORITY[model_index]}")
+
+    logger.warning("⚠️ All models/keys failed. Returning original caption.")
     return caption
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
