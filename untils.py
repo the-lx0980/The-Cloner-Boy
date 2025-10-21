@@ -91,20 +91,20 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
                     caption = None
                 if ai_caption and caption:
                     caption = await extract_caption_ai(message.caption)
-                    await bot.send_cached_media(
+                await bot.send_cached_media(
                         chat_id=to_chat,
                         file_id=media.file_id,
-                        caption=message.caption
+                        caption=f"***{caption}***"
                     )
                 except FloodWait as e:
-                    await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
+                    await asyncio.sleep(e.value)
                     await forward_messages(bot, message, from_chat, to_chat, ai_caption)
     else:
         try:
             await bot.copy_message(
                 chat_id=to_chat,
                 from_chat_id=from_chat,
-                caption='**{message.caption}**',
+                caption=f'***{message.caption}***',
                 message_id=message.id,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
