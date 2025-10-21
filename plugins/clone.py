@@ -3,8 +3,8 @@ import re
 import logging
 from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
-from pyrogram.errors import FloodWait
 from config import Config
+from utils import forwards_messages
 
 logger = logging.getLogger(__name__)
 
@@ -134,9 +134,9 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     fetched = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
-    from_chat = 
-    to_chat = 
-    ai_caption = 
+    from_chat = chat
+    to_chat = CHANNEL.get(user_id)
+    ai_caption = AI_CAPTION.get(user_id)
     # lst_msg_id is same to total messages
 
     try:
@@ -152,11 +152,12 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                await forwards_messages(bot, message, from_chat, to_chat, ai_caption) 
+                forward = await forwards_messages(bot, message, from_chat, to_chat, ai_caption, user_id)
+                if forward:
+                    forwarded += 1
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
-            forwarded += 1
             await asyncio.sleep(delay)            
     except Exception as e:
         logger.exception(e)
