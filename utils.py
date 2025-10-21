@@ -1,100 +1,112 @@
-import os, asyncio
+import os
+import asyncio
+import logging
 from itertools import cycle
 from openai import OpenAI
-from pyrogram import enums
+from openai.error import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    ServiceUnavailableError,
+    Timeout,
+)
 from pyrogram.errors import FloodWait
+from pyrogram import enums
 
+logging.basicConfig(
+    format="%(asctime)s - [AI-CAPTION] - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger("AICaptionExtractor")
 
 keys = os.environ.get("OPENAI_API_KEYS") or os.environ.get("OPENAI_API_KEY")
 
 if not keys:
-    raise Exception("No OpenAI API keys found. Set OPENAI_API_KEYS or OPENAI_API_KEY in environment.")
+    raise Exception("❌ No OpenAI API keys found. Set OPENAI_API_KEYS or OPENAI_API_KEY in environment.")
 
-# Split and clean
 OPENAI_API_KEYS = [k.strip() for k in keys.split(",") if k.strip()]
-
 if not OPENAI_API_KEYS:
-    raise Exception("No valid API keys found.")
+    raise Exception("❌ No valid API keys found.")
 
-# If only one key → single client mode
 if len(OPENAI_API_KEYS) == 1:
     _ai_client = OpenAI(api_key=OPENAI_API_KEYS[0])
 
     def get_ai_client() -> OpenAI:
-        """Always return the same client (fast single-key mode)."""
+        """Return the single pre-initialized OpenAI client."""
         return _ai_client
-
+    logger.info("🔑 Single API key mode enabled.")
 else:
-    # Multiple keys → pre-create clients and rotate sequentially
     _ai_clients = [OpenAI(api_key=k) for k in OPENAI_API_KEYS]
     _client_cycle = cycle(_ai_clients)
 
     def get_ai_client() -> OpenAI:
-        """Return next client in round-robin (multi-key mode)."""
+        """Return the next OpenAI client (round-robin rotation)."""
         return next(_client_cycle)
-        
-
+    logger.info(f"🔁 Multi-key rotation enabled ({len(OPENAI_API_KEYS)} keys).")
 
 async def extract_caption_ai(caption: str) -> str:
     """
-    Send caption to OpenAI to clean & format for movie/series.
-    Returns formatted caption or original if AI fails.
+    Clean and format captions for movies or series using OpenAI.
+    Returns the formatted caption or original caption if AI fails.
     """
+    if not caption or len(caption.strip()) < 3:
+        logger.debug("🟡 Skipped empty/short caption for AI processing.")
+        return caption
+
     ai = get_ai_client()
     prompt = f"""
 You are a highly accurate movie and series caption formatter.
 
-Your task:
-1. Detect whether the caption refers to a **movie** or a **series**.
-2. Extract and reformat details properly using the following rules.
+Rules:
+- Detect movie/series.
+- Format neatly, no emojis.
+- Return only text.
 
-────────────────────────────
-🎬 FOR MOVIES:
-Format:
-<Movie Name> (<Year>) <Quality> <Print> <Audio>
-
-Example:
-Venom (2021) 1080p WEB-DL Dual Audio (Hindi + English)
-
-────────────────────────────
-📺 FOR SERIES:
-Format:
-<Series Name> (<Year>) S<SeasonNo:02d> [E<EpisodeNo:02d> or E<EpisodeRange>] <Quality> <Print> <Audio>
-
-Examples:
-Loki (2023) S01 E03 1080p WEB-DL Dual Audio (Hindi + English)
-Squid Game (2025) S03 E01–E10 1080p DS4K DDP 5.1 Multi Audio (Hindi + English + Korean)
-Peacemaker (2025) S02 Complete 480p HEVC Dual Audio (Hindi + English)
-
-────────────────────────────
-Formatting Rules:
-- Season format: S01, S02, … (not “Season 1”)
-- Episode format: E01, E02, … (not “Episode 1”)
-- Episode range (e.g. “E01 - E10”) → “E01–E10”
-- If “Complete” season is mentioned, include “Complete” after the season.
-- Audio:
-    - “[Hindi - English]” → “Dual Audio (Hindi + English)”
-    - “[Hindi - English - Korean]” → “Multi Audio (Hindi + English + Korean)”
-    - Include “DDP 5.1”, “ORG”, etc., after the print if present.
-- Keep spacing clean and consistent.
-- Skip unknown or missing fields gracefully (do not guess).
-- Output plain text only (no Markdown, no emojis).
-
-────────────────────────────
 Input caption:
 {caption}
-
-Return only the cleaned and formatted caption.
 """
-    try:
-        response = ai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print("AI Error:", e)
-        return caption
+
+    # Retry mechanism
+    for attempt in range(3):
+        try:
+            logger.info(f"🧠 Sending caption to AI (attempt {attempt + 1})")
+            response = ai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                timeout=20,
+            )
+            formatted = response.choices[0].message.content.strip()
+            logger.info("✅ Caption formatted successfully.")
+            return formatted
+
+        except FloodWait as e:
+            logger.warning(f"⚠️ FloodWait: sleeping {e.value}s before retry.")
+            await asyncio.sleep(e.value)
+
+        except RateLimitError as e:
+            logger.warning(f"🚫 Rate limit hit on key. Rotating key... ({e})")
+            ai = get_ai_client()
+            await asyncio.sleep(1)
+
+        except AuthenticationError as e:
+            logger.error(f"❌ Invalid API key: {e}")
+            ai = get_ai_client()
+
+        except (APIConnectionError, Timeout) as e:
+            logger.warning(f"🌐 Connection issue: {e}. Retrying...")
+            await asyncio.sleep(2)
+
+        except (APIError, ServiceUnavailableError) as e:
+            logger.warning(f"🧩 OpenAI internal error: {e}. Retrying after delay...")
+            await asyncio.sleep(3)
+
+        except Exception as e:
+            logger.error(f"❌ Unexpected AI Caption Error: {e}")
+            await asyncio.sleep(2)
+
+    logger.warning("⚠️ AI formatting failed after retries. Using original caption.")
+    return caption
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     if message.media: 
