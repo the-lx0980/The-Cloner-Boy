@@ -1,12 +1,7 @@
 import logging
 import re
 from PTT import parse_title
-from database import (
-    get_movie_year,
-    save_movie_year,
-    get_or_fetch_series_year
-)
-from tmdb import fetch_movie_year_tmdb  # your TMDB fetch function
+from .database import get_or_fetch_series_year, get_or_fetch_movie_year
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -16,7 +11,7 @@ async def extract_caption(title: str) -> str:
     Parse torrent title using Parsett (PTT) with:
     - Correct resolution/source override
     - Audio + language formatting
-    - Auto fetch release year if missing
+    - Auto fetch release year if missing (DB + TMDb for movies, DB + AI for series)
     """
     if not title or len(title.strip()) < 3:
         return title
@@ -35,19 +30,14 @@ async def extract_caption(title: str) -> str:
                 season_no = seasons[0] if seasons else 1
                 year = await get_or_fetch_series_year(name, season_no)
             else:
-                year = get_movie_year(name)
-                if not year:
-                    # Fetch from TMDB for movies
-                    year = fetch_movie_year_tmdb(name)
-                    if year:
-                        save_movie_year(name, year)
+                year = await get_or_fetch_movie_year(name)
 
         year_str = f"({year})" if year else ""
 
         # --- Resolution / Source ---
         resolution = data.get("resolution", "")
         quality = data.get("quality", "")
-        codec = (data.get("codec", "") or "").lower()
+        codec = (data.get("codec") or "").lower()
         bit_depth = data.get("bit_depth", "")
         channels_list = data.get("channels", [])
 
