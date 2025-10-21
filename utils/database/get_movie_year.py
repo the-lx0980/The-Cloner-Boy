@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from .database import get_movie_year, save_movie_year
 import tmdbsimple as tmdb
 
@@ -40,16 +41,31 @@ def fetch_movie_year_tmdb(title: str) -> int | None:
         return None
 
 
-def get_or_fetch_movie_year(title: str) -> int | None:
+async def get_or_fetch_movie_year(title: str) -> int | None:
     """
+    Async version:
     1. Check MongoDB first.
-    2. If missing, fetch from TMDb.
+    2. If missing, fetch from TMDb asynchronously.
     3. Store in MongoDB.
     """
+    # 1️⃣ Check DB
     year = get_movie_year(title)
     if year:
         logger.info(f"📦 Found in DB: {title} → {year}")
         return year
 
-    logger.info(f"🔍 Year missing for '{title}', fetching via TMDb...")
-    return fetch_movie_year_tmdb(title)
+    # 2️⃣ Fetch from TMDb
+    logger.info(f"🔍 Year missing for '{title}', fetching via TMDb asynchronously...")
+    try:
+        year = fetch_movie_year_tmdb_async(title)
+    except Exception as e:
+        logger.error(f"❌ TMDb fetch failed for '{title}': {e}")
+        return None
+
+    if year:
+        save_movie_year(title, year)
+        logger.info(f"✅ Saved movie year: {title} → {year}")
+    else:
+        logger.warning(f"⚠️ Could not fetch year for '{title}' from TMDb")
+
+    return year
