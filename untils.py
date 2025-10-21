@@ -35,30 +35,46 @@ async def extract_caption_ai(caption: str) -> str:
 You are a highly accurate movie and series caption formatter.
 
 Your task:
-1. Detect whether the caption is a movie or a series.
-2. Reformat details properly.
+1. Detect whether the caption refers to a **movie** or a **series**.
+2. Extract and reformat details properly using the following rules.
 
-Movies format:
+────────────────────────────
+🎬 FOR MOVIES:
+Format:
 <Movie Name> (<Year>) <Quality> <Print> <Audio>
 
-Series format:
+Example:
+Venom (2021) 1080p WEB-DL Dual Audio (Hindi + English)
+
+────────────────────────────
+📺 FOR SERIES:
+Format:
 <Series Name> (<Year>) S<SeasonNo:02d> [E<EpisodeNo:02d> or E<EpisodeRange>] <Quality> <Print> <Audio>
 
-Rules:
-- Season: S01, S02...
-- Episode: E01, E02...
-- Episode ranges: E01–E10
-- "Complete" after season if applicable
-- Audio: Dual Audio / Multi Audio formatting
-- Include print info (DDP 5.1, ORG) if present
-- No Markdown or emojis
-- Keep spacing clean
-- Skip missing/unknown fields
+Examples:
+Loki (2023) S01 E03 1080p WEB-DL Dual Audio (Hindi + English)
+Squid Game (2025) S03 E01–E10 1080p DS4K DDP 5.1 Multi Audio (Hindi + English + Korean)
+Peacemaker (2025) S02 Complete 480p HEVC Dual Audio (Hindi + English)
 
+────────────────────────────
+Formatting Rules:
+- Season format: S01, S02, … (not “Season 1”)
+- Episode format: E01, E02, … (not “Episode 1”)
+- Episode range (e.g. “E01 - E10”) → “E01–E10”
+- If “Complete” season is mentioned, include “Complete” after the season.
+- Audio:
+    - “[Hindi - English]” → “Dual Audio (Hindi + English)”
+    - “[Hindi - English - Korean]” → “Multi Audio (Hindi + English + Korean)”
+    - Include “DDP 5.1”, “ORG”, etc., after the print if present.
+- Keep spacing clean and consistent.
+- Skip unknown or missing fields gracefully (do not guess).
+- Output plain text only (no Markdown, no emojis).
+
+────────────────────────────
 Input caption:
 {caption}
 
-Return only the cleaned formatted caption.
+Return only the cleaned and formatted caption.
 """
     try:
         response = ai.chat.completions.create(
