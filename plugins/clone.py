@@ -146,7 +146,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     FORWARDING[user_id] = True
     from_chat = chat
     to_chat = CHANNEL.get(user_id)
-    ai_caption = AI_CAPTION.get(user_id)
+    ai_caption = AI_CAPTION.get(user_id, False)
     # lst_msg_id is same to total messages
 
     try:
