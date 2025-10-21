@@ -152,12 +152,11 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                forward = await forwards_messages(bot, message, from_chat, to_chat, ai_caption, user_id)
-                if forward:
-                    forwarded += 1
+                await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
             except Exception as e:
                 logger.exception(e)
-                return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
+                return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
+            forwarded += 1
             await asyncio.sleep(delay)            
     except Exception as e:
         logger.exception(e)
