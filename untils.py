@@ -81,9 +81,15 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
             try: 
                 if message.caption:
                     caption = message.caption
+                elif message.video:
+                    caption = message.video.file_name
+                elif message.document:
+                    caption = message.document.file_name
+                elif message.audio:
+                    caption = message.audio.file_name 
                 else:
-                    caption = 
-                if ai_caption:
+                    caption = None
+                if ai_caption and caption:
                     caption = await extract_caption_ai(message.caption)
                     await bot.copy_message(
                         chat_id=to_chat,
