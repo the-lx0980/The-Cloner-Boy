@@ -1,5 +1,5 @@
-# ai_caption.py
-import os
+
+import os, asyncio
 from itertools import cycle
 from openai import OpenAI
 from pyrogram import enums
