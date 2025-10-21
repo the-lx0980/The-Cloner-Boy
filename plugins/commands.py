@@ -117,7 +117,7 @@ async def cleardb_command(client: Client, message: Message):
         f"⚠️ This will delete **all {total_docs} documents** from the database!\n\n"
         "Do you want to continue?",
         reply_markup=keyboard,
-        parse_mode="enums.ParseMode.MARKDOWN"
+        parse_mode=enums.ParseMode.MARKDOWN
     )
 
 
