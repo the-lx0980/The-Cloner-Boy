@@ -1,12 +1,22 @@
 import logging
 import re
 from PTT import parse_title
+from database import (
+    get_movie_year,
+    save_movie_year,
+    get_or_fetch_series_year
+)
+from tmdb import fetch_movie_year_tmdb  # your TMDB fetch function
+import asyncio
 
 logger = logging.getLogger(__name__)
 
-def extract_caption(title: str) -> str:
+async def extract_caption(title: str) -> str:
     """
-    Parse torrent title using Parsett (PTT) with corrected resolution/source override priority.
+    Parse torrent title using Parsett (PTT) with:
+    - Correct resolution/source override
+    - Audio + language formatting
+    - Auto fetch release year if missing
     """
     if not title or len(title.strip()) < 3:
         return title
@@ -19,22 +29,33 @@ def extract_caption(title: str) -> str:
         episodes = data.get("episodes") or []
         type_ = "series" if seasons else "movie"
 
-        # Base values from PTT
+        # --- Auto fetch year if missing ---
+        if not year:
+            if type_ == "series":
+                season_no = seasons[0] if seasons else 1
+                year = await get_or_fetch_series_year(name, season_no)
+            else:
+                year = get_movie_year(name)
+                if not year:
+                    # Fetch from TMDB for movies
+                    year = fetch_movie_year_tmdb(name)
+                    if year:
+                        save_movie_year(name, year)
+
+        year_str = f"({year})" if year else ""
+
+        # --- Resolution / Source ---
         resolution = data.get("resolution", "")
         quality = data.get("quality", "")
         codec = (data.get("codec", "") or "").lower()
         bit_depth = data.get("bit_depth", "")
         channels_list = data.get("channels", [])
-        channels = ", ".join(channels_list)
 
         t_lower = title.lower()
-
-        # ✅ 1. Resolution Manual Fix (takes priority)
         match_res = re.search(r"(480p|720p|1080p|2160p|4k)", t_lower)
         if match_res:
             resolution = match_res.group(1)
 
-        # ✅ 2. Source Detection (NF / AMZN / WEBRip / HDRip / BluRay / DS4K)
         source_tags = [
             ("ds4k", "DS4K"),
             ("nf", "NF"),
@@ -51,12 +72,9 @@ def extract_caption(title: str) -> str:
                 source = name_
                 break
 
-        # ✅ 3. Combine source + quality properly
-        quality_final = source if source else ""
-        if quality and source.lower() not in quality.lower():
-            quality_final = f"{quality_final} {quality}".strip()
+        quality_final = " ".join(filter(None, [source, quality]))
 
-        # --- Audio + Language Formatting ---
+        # --- Audio / Language ---
         audio_list = data.get("audio", [])
         languages = data.get("languages", [])
 
@@ -70,30 +88,22 @@ def extract_caption(title: str) -> str:
 
         audio_list = [clean_audio_name(a) for a in audio_list]
 
-        # Audio format priority
         audio_fmt = ""
         for fmt in ["Atmos", "TrueHD", "DD+", "DD", "DTS HD MA", "AAC", "FLAC"]:
             if any(fmt.lower() in a.lower() for a in audio_list):
                 audio_fmt = fmt
                 break
 
-        # Add channels
-        if channels_list:
-            ch_info = channels_list[0]
-            if audio_fmt:
-                audio_fmt = f"{audio_fmt} {ch_info}"
+        if channels_list and audio_fmt:
+            audio_fmt = f"{audio_fmt} {channels_list[0]}"
 
-        # --- Language Format ---
         if languages:
             lang_text = " + ".join(languages)
             audio_lang = f"Multi Audio ({lang_text})" if len(languages) > 1 else languages[0]
         else:
             audio_lang = ""
 
-        # --- Year format ---
-        year_str = f"({year})" if year else ""
-
-        # --- Final caption ---
+        # --- Final Caption ---
         if type_ == "series":
             season_no = seasons[0] if seasons else 1
             if episodes:
@@ -104,7 +114,6 @@ def extract_caption(title: str) -> str:
         else:
             formatted = f"{name} {year_str} {resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
 
-        # ✅ Ensure correct extension
         if not re.search(r"\.(mkv|mp4|avi|mov)$", formatted, re.I):
             formatted += " .mkv"
 
