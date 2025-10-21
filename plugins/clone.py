@@ -134,6 +134,9 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     fetched = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
+    from_chat = 
+    to_chat = 
+    ai_caption = 
     # lst_msg_id is same to total messages
 
     try:
@@ -149,6 +152,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
+                await forwards_messages(bot, message, from_chat, to_chat, ai_caption) 
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
