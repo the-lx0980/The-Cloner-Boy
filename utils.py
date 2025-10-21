@@ -77,7 +77,6 @@ Input:
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
                 timeout=20,
-                max_retries=0,
             )
             formatted = response.choices[0].message.content.strip()
             logger.info(f"✅ Caption formatted with {model}.")
