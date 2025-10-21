@@ -1,4 +1,3 @@
-
 import os, asyncio
 from itertools import cycle
 from openai import OpenAI
@@ -26,9 +25,6 @@ def get_ai_client() -> OpenAI:
     return OpenAI(api_key=key)
 
 
-# ───────────────────────────────
-# AI CAPTION EXTRACTION
-# ───────────────────────────────
 async def extract_caption_ai(caption: str) -> str:
     """
     Send caption to OpenAI to clean & format for movie/series.
