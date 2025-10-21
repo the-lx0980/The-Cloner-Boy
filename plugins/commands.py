@@ -90,10 +90,9 @@ async def showid(client, message):
         await message.reply_text(f'★ Channel ID: <code>{message.chat.id}</code>')
 
 
-
 @Client.on_message(filters.command("cleardb") & filters.private)
 async def cleardb_command(client: Client, message: Message):
-    if not collection:
+    if collection is None:
         await message.reply_text("⚠️ MongoDB connection not available.")
         return
 
@@ -120,8 +119,8 @@ async def cleardb_command(client: Client, message: Message):
 
 
 @Client.on_callback_query()
-async def cleardb_callback(client, callback_query):
-    if not collection:
+async def cleardb_callback(client: Client, callback_query):
+    if collection is None:
         await callback_query.answer("⚠️ MongoDB not available.", show_alert=True)
         return
 
