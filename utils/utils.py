@@ -1,7 +1,7 @@
 import asyncio
 from pyrogram.errors import FloodWait
 from pyrogram import enums
-from .tmdb_utils import extract_caption_parser
+from .parse_caption import extract_caption
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     if message.media: 
