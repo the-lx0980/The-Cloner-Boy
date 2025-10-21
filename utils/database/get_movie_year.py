@@ -2,6 +2,8 @@ import logging
 import asyncio
 from .database import get_movie_year, save_movie_year
 import tmdbsimple as tmdb
+import re
+from PTT import parse_title
 
 logger = logging.getLogger("MovieYearFetcher")
 
@@ -36,12 +38,25 @@ def fetch_movie_year_tmdb(title: str) -> int | None:
         logger.exception(f"❌ TMDb fetch failed for '{title}': {e}")
         return None
 
-
+def clean_movie_title(title: str) -> str:
+    """Extract clean movie title for TMDb query."""
+    try:
+        data = parse_title(title, translate_languages=True)
+        name = data.get("title")
+        if name:
+            return name.strip()
+    except Exception:
+        pass
+    # Fallback: remove common tags manually
+    name = re.sub(r"(\b\d{3,4}p\b|\b4k\b|\bWEBRip\b|\bHDRip\b|\bBluRay\b|\bNF\b|\bAMZN\b)", "", title, flags=re.I)
+    return name.strip()
+    
 async def get_or_fetch_movie_year(title: str) -> int | None:
     """
     Async wrapper for TMDb fetch to avoid blocking event loop.
     """
     # 1️⃣ Check DB
+    title = clean_movie_title(title) 
     year = get_movie_year(title)
     if year:
         logger.info(f"📦 Found in DB: {title} → {year}")
