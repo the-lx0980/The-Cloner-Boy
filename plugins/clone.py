@@ -149,47 +149,6 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                if message.media:
-                    if message.media not in [
-                        MessageMediaType.PHOTO,
-                        MessageMediaType.DOCUMENT,
-                        MessageMediaType.AUDIO,
-                        MessageMediaType.STICKER,
-                        MessageMediaType.VIDEO]:
-                        continue 
-                    media = getattr(message, message.media.value, None)
-                    if media:
-                        try:
-                            await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
-                                file_id=media.file_id,
-                                caption=message.caption
-                            )
-                        except FloodWait as e:
-                            await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                            await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
-                                file_id=media.file_id,
-                                caption=message.caption
-                            )
-                else:
-                    try:
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption='**{message.caption}**',
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
-                        )
-                    except FloodWait as e:
-                        await asyncio.sleep(e.value)
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption='**{message.caption}**',
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
-                        )
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
