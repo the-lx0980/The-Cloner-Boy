@@ -20,7 +20,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 caption = None
 
             if ai_caption and caption:
-                caption = await extract_caption_parser(caption)
+                caption = await extract_caption(caption)
 
             try:
                 await bot.send_cached_media(
