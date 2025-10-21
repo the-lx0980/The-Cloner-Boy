@@ -1,12 +1,10 @@
 from pyrogram import Client, filters, enums
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from config import Config as a
 import asyncio
 import sys
 import os
 import logging
-from pyrogram import filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from utils.database import collection  # Assuming collection is exported from database.py
 
 logger = logging.getLogger("ClearDBCommand")
