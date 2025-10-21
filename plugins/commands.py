@@ -4,6 +4,12 @@ from config import Config as a
 import asyncio
 import sys
 import os
+import logging
+from pyrogram import filters
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from utils.database import collection  # Assuming collection is exported from database.py
+
+logger = logging.getLogger("ClearDBCommand")
 
 
 @Client.on_message(filters.private & (filters.command("start") | filters.regex("start")) & filters.incoming)
@@ -84,3 +90,58 @@ async def showid(client, message):
 
     elif chat_type == enums.ChatType.CHANNEL:
         await message.reply_text(f'★ Channel ID: <code>{message.chat.id}</code>')
+
+
+logger = logging.getLogger("ClearDBCommand")
+
+async def register_cleardb(client):
+    @client.on_message(filters.command("cleardb") & filters.private)
+    async def cleardb_command(client, message: Message):
+        if not collection:
+            await message.reply_text("⚠️ MongoDB connection not available.")
+            return
+
+        total_docs = collection.count_documents({})
+        if total_docs == 0:
+            await message.reply_text("📦 Database is already empty.")
+            return
+
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Confirm Delete", callback_data="confirm_delete"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_delete")
+                ]
+            ]
+        )
+
+        await message.reply_text(
+            f"⚠️ This will delete **all {total_docs} documents** from the database!\n\n"
+            "Do you want to continue?",
+            reply_markup=keyboard,
+            parse_mode="markdown"
+        )
+
+    @client.on_callback_query()
+    async def cleardb_callback(client, callback_query):
+        if not collection:
+            await callback_query.answer("⚠️ MongoDB not available.", show_alert=True)
+            return
+
+        if callback_query.data == "cancel_delete":
+            await callback_query.message.edit_text("❌ Deletion canceled.")
+            await callback_query.answer()
+            return
+
+        if callback_query.data == "confirm_delete":
+            total_docs = collection.count_documents({})
+            if total_docs == 0:
+                await callback_query.message.edit_text("📦 Database is already empty.")
+                await callback_query.answer()
+                return
+
+            result = collection.delete_many({})
+            await callback_query.message.edit_text(
+                f"✅ Database cleaned successfully!\nDeleted {result.deleted_count} documents."
+            )
+            await callback_query.answer()
