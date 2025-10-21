@@ -1,31 +1,55 @@
-from PTT import parser  # Parser from your link
+import logging
+from PTT import parse_title
 from .tmdb_utils import fetch_year_from_tmdb
 
-async def extract_caption_parser(caption: str) -> str:
+logger = logging.getLogger(__name__)
+
+def extract_caption(title: str) -> str:
     """
-    Parse caption using PTT parser, add TMDb year if missing.
+    Parse a torrent title using Parsett (PTT).
+    If year is missing, fetch from TMDb.
+    Format according to your rules.
     """
-    if not caption or len(caption.strip()) < 3:
-        return caption
+    if not title or len(title.strip()) < 3:
+        return title
 
     try:
-        result = parser.parse_caption(caption)  # PTT parser returns dict
-        # Example result: {"name": "Venom", "year": None, "season": None, "episode": None, "quality": "1080p"}
-        if not result.get("year"):
-            type_ = "series" if result.get("season") else "movie"
-            result["year"] = fetch_year_from_tmdb(result["name"], type_=type_)
+        data = parse_title(title, translate_languages=True)
+        name = data.get("title")
+        year = data.get("year")
+        seasons = data.get("seasons") or []
+        episodes = data.get("episodes") or []
 
-        # Build formatted caption
-        if result.get("season"):
-            # Series
-            ep_part = f"E{result['episode']:02d}" if result.get("episode") else "Complete"
-            formatted = f"{result['name']} ({result['year']}) S{result['season']:02d} {ep_part} {result.get('quality','')} {result.get('print','')} {result.get('audio','')}".strip()
+        # Determine type
+        type_ = "series" if seasons else "movie"
+        if not year and name:
+            year = fetch_year_from_tmdb(name, type_=type_)
+
+        # Quality / print / audio
+        quality = data.get("quality", "")
+        codec = data.get("codec", "")
+        audio = ", ".join(data.get("audio", []))
+        resolution = data.get("resolution", "")
+
+        # Format output
+        if type_ == "series":
+            season_no = seasons[0] if seasons else 1
+            ep_part = ""
+            if episodes:
+                if len(episodes) == 1:
+                    ep_part = f"E{episodes[0]:02d}"
+                else:
+                    ep_part = f"E{episodes[0]:02d}–E{episodes[-1]:02d}"
+            else:
+                ep_part = "Complete"
+
+            formatted = f"{name} ({year}) S{season_no:02d} {ep_part} {resolution} {quality} {codec} {audio}".strip()
+
         else:
-            # Movie
-            formatted = f"{result['name']} ({result['year']}) {result.get('quality','')} {result.get('print','')} {result.get('audio','')}".strip()
+            formatted = f"{name} ({year}) {resolution} {quality} {codec} {audio}".strip()
 
         return formatted
 
     except Exception as e:
-        logger.exception(f"Caption parser failed: {e}")
-        return caption
+        logger.exception(f"Caption extraction failed: {e}")
+        return title
