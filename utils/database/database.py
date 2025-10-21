@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 # MongoDB Connection Setup
 # -------------------------------
 try:
-    client = MongoClient("mongodb://localhost:27017", serverSelectionTimeoutMS=5000)
+    client = MongoClient("mongodb+srv://kareem9075:C93PrxDdIQrtStxB@cluster0.j2xlpdt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", serverSelectionTimeoutMS=5000)
     db = client["media_db"]
     collection = db["media_info"]
     client.server_info()  # test connection
