@@ -1,7 +1,7 @@
 from PTT import parser  # Parser from your link
-from tmdb_utils import fetch_year_from_tmdb
+from .tmdb_utils import fetch_year_from_tmdb
 
-async def extract_caption_ai_or_parser(caption: str) -> str:
+async def extract_caption_parser(caption: str) -> str:
     """
     Parse caption using PTT parser, add TMDb year if missing.
     """
