@@ -1,6 +1,7 @@
 import time
 import asyncio
 import logging
+import os
 from itertools import cycle
 from openai import OpenAI
 import openai
