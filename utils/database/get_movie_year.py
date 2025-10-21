@@ -11,7 +11,7 @@ tmdb.API_KEY = "YOUR_TMDB_API_KEY"
 
 def fetch_movie_year_tmdb(title: str) -> int | None:
     """
-    Fetch movie release year from TMDb using movie title.
+    Synchronous TMDb fetch.
     """
     try:
         search = tmdb.Search()
@@ -22,14 +22,10 @@ def fetch_movie_year_tmdb(title: str) -> int | None:
             logger.warning(f"⚠️ TMDb: No results found for '{title}'")
             return None
 
-        # Take the first result
         movie_data = results[0]
-        year = None
-        release_date = movie_data.get("release_date")  # format: 'YYYY-MM-DD'
+        release_date = movie_data.get("release_date")
         if release_date and len(release_date) >= 4:
             year = int(release_date[:4])
-
-        if year:
             save_movie_year(title, year)
             logger.info(f"✅ TMDb: Saved {title} → {year}")
             return year
@@ -37,16 +33,13 @@ def fetch_movie_year_tmdb(title: str) -> int | None:
         return None
 
     except Exception as e:
-        logger.exception(f"❌ TMDb fetch failed for {title}: {e}")
+        logger.exception(f"❌ TMDb fetch failed for '{title}': {e}")
         return None
 
 
 async def get_or_fetch_movie_year(title: str) -> int | None:
     """
-    Async version:
-    1. Check MongoDB first.
-    2. If missing, fetch from TMDb asynchronously.
-    3. Store in MongoDB.
+    Async wrapper for TMDb fetch to avoid blocking event loop.
     """
     # 1️⃣ Check DB
     year = get_movie_year(title)
@@ -54,18 +47,14 @@ async def get_or_fetch_movie_year(title: str) -> int | None:
         logger.info(f"📦 Found in DB: {title} → {year}")
         return year
 
-    # 2️⃣ Fetch from TMDb
-    logger.info(f"🔍 Year missing for '{title}', fetching via TMDb asynchronously...")
-    try:
-        year = fetch_movie_year_tmdb_async(title)
-    except Exception as e:
-        logger.error(f"❌ TMDb fetch failed for '{title}': {e}")
-        return None
+    # 2️⃣ Fetch from TMDb asynchronously using executor
+    logger.info(f"🔍 Year missing for '{title}', fetching via TMDb...")
+    loop = asyncio.get_running_loop()
+    year = await loop.run_in_executor(None, fetch_movie_year_tmdb, title)
 
     if year:
-        save_movie_year(title, year)
-        logger.info(f"✅ Saved movie year: {title} → {year}")
+        logger.info(f"✅ Movie year obtained: {title} → {year}")
     else:
-        logger.warning(f"⚠️ Could not fetch year for '{title}' from TMDb")
+        logger.warning(f"⚠️ Could not fetch year for '{title}'")
 
     return year
