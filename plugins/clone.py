@@ -4,7 +4,7 @@ import logging
 from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
 from config import Config
-from utils import forwards_messages
+from utils.utils import forwards_messages
 
 logger = logging.getLogger(__name__)
 
