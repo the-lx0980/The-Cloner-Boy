@@ -76,36 +76,39 @@ Return only the cleaned formatted caption.
 
 async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
     if message.media: 
-        media = getattr(message, message.media.value, None)
+        media_type = message.media.value
+        media = getattr(message, media_type, None)
         if media:
-            try: 
-                if message.caption:
-                    caption = message.caption
-                elif message.video:
-                    caption = message.video.file_name
-                elif message.document:
-                    caption = message.document.file_name
-                elif message.audio:
-                    caption = message.audio.file_name 
-                else:
-                    caption = None
-                if ai_caption and caption:
-                    caption = await extract_caption_ai(message.caption)
+            if message.caption:
+                caption = message.caption
+            elif message.video:
+                caption = message.video.file_name
+            elif message.document:
+                caption = message.document.file_name
+            elif message.audio:
+                caption = message.audio.file_name 
+            else:
+                caption = None
+
+            if ai_caption and caption:
+                caption = await extract_caption_ai(caption)
+
+            try:
                 await bot.send_cached_media(
-                        chat_id=to_chat,
-                        file_id=media.file_id,
-                        caption=f"***{caption}***"
-                    )
-                except FloodWait as e:
-                    await asyncio.sleep(e.value)
-                    await forward_messages(bot, message, from_chat, to_chat, ai_caption)
+                    chat_id=to_chat,
+                    file_id=media.file_id,
+                    caption=f"***{caption or ''}***"
+                )
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+                await forward_messages(bot, message, from_chat, to_chat, ai_caption)
     else:
         try:
             await bot.copy_message(
                 chat_id=to_chat,
                 from_chat_id=from_chat,
-                caption=f'***{message.caption}***',
                 message_id=message.id,
+                caption=f'***{message.caption or ""}***',
                 parse_mode=enums.ParseMode.MARKDOWN
             )
         except FloodWait as e:
