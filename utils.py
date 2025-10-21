@@ -5,24 +5,34 @@ from pyrogram import enums
 from pyrogram.errors import FloodWait
 
 
-keys = os.environ.get("OPENAI_API_KEYS")
+keys = os.environ.get("OPENAI_API_KEYS") or os.environ.get("OPENAI_API_KEY")
+
 if not keys:
-    raise Exception("No OpenAI API keys found. Set OPENAI_API_KEYS in environment.")
+    raise Exception("No OpenAI API keys found. Set OPENAI_API_KEYS or OPENAI_API_KEY in environment.")
 
+# Split and clean
 OPENAI_API_KEYS = [k.strip() for k in keys.split(",") if k.strip()]
+
 if not OPENAI_API_KEYS:
-    raise Exception("No valid API keys found in OPENAI_API_KEYS.")
+    raise Exception("No valid API keys found.")
 
-# Round-robin cycle for sequential rotation
-_ai_key_cycle = cycle(OPENAI_API_KEYS)
+# If only one key → single client mode
+if len(OPENAI_API_KEYS) == 1:
+    _ai_client = OpenAI(api_key=OPENAI_API_KEYS[0])
 
-def get_ai_client() -> OpenAI:
-    """
-    Returns an OpenAI client with the next API key in the cycle.
-    """
-    key = next(_ai_key_cycle)
-    # Optional: print(f"🔑 Using OpenAI Key: {key[:8]}...")
-    return OpenAI(api_key=key)
+    def get_ai_client() -> OpenAI:
+        """Always return the same client (fast single-key mode)."""
+        return _ai_client
+
+else:
+    # Multiple keys → pre-create clients and rotate sequentially
+    _ai_clients = [OpenAI(api_key=k) for k in OPENAI_API_KEYS]
+    _client_cycle = cycle(_ai_clients)
+
+    def get_ai_client() -> OpenAI:
+        """Return next client in round-robin (multi-key mode)."""
+        return next(_client_cycle)
+        
 
 
 async def extract_caption_ai(caption: str) -> str:
