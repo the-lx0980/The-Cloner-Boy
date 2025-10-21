@@ -5,7 +5,7 @@ import logging
 from itertools import cycle
 import openai
 
-from database.media_db import get_series_year, save_series_year
+from .database import get_series_year, save_series_year
 
 logger = logging.getLogger("AIYearFetcher")
 
