@@ -6,7 +6,7 @@ import tmdbsimple as tmdb
 logger = logging.getLogger("MovieYearFetcher")
 
 # Set your TMDb API key
-tmdb.API_KEY = "YOUR_TMDB_API_KEY"
+tmdb.API_KEY = "b043bef236e1b972f25dcb382ef1af76"
 
 
 def fetch_movie_year_tmdb(title: str) -> int | None:
