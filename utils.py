@@ -109,7 +109,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 await bot.send_cached_media(
                     chat_id=to_chat,
                     file_id=media.file_id,
-                    caption=f"***{caption or ''}***"
+                    caption=f"**{caption or ''}**"
                 )
             except FloodWait as e:
                 await asyncio.sleep(e.value)
@@ -120,7 +120,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 chat_id=to_chat,
                 from_chat_id=from_chat,
                 message_id=message.id,
-                caption=f'***{message.caption or ""}***',
+                caption=f'**{message.caption or ""}**',
                 parse_mode=enums.ParseMode.MARKDOWN
             )
         except FloodWait as e:
