@@ -96,7 +96,7 @@ def extract_caption(title: str) -> str:
 
         # Add .mkv at end (only if no other extension present)
         if not any(formatted.lower().endswith(ext) for ext in [".mkv", ".mp4", ".avi", ".mov"]):
-            formatted += " .mkv"
+            formatted += ".mkv"
 
         # Clean spaces
         formatted = " ".join(formatted.split())
