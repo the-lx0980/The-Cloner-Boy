@@ -15,26 +15,31 @@ def extract_caption(title: str) -> str:
     try:
         data = parse_title(title, translate_languages=True)
         name = data.get("title") or ""
-        year = data.get("year")  # Keep as-is; don't fetch from API
+        year = data.get("year")  # Keep as-is
         seasons = data.get("seasons") or []
         episodes = data.get("episodes") or []
 
-        # Determine type
         type_ = "series" if seasons else "movie"
 
-        # Quality / print / audio
+        # Quality / print / codec / audio / resolution / bit depth / channels
         quality = data.get("quality", "")
-        codec = data.get("codec", "")
-        audio_list = data.get("audio", [])
-        audio = "Dual Audio (" + " + ".join(audio_list) + ")" if len(audio_list) == 2 else \
-                "Multi Audio (" + " + ".join(audio_list) + ")" if len(audio_list) > 2 else \
-                ", ".join(audio_list)
+        codec = data.get("codec", "").lower()
         resolution = data.get("resolution", "")
+        bit_depth = data.get("bit_depth", "")
+        channels = ", ".join(data.get("channels", []))
+
+        audio_list = data.get("audio", [])
+        if len(audio_list) == 2:
+            audio = f"Dual Audio ({' + '.join(audio_list)})"
+        elif len(audio_list) > 2:
+            audio = f"Multi Audio ({' + '.join(audio_list)})"
+        else:
+            audio = ", ".join(audio_list)
 
         # Format year string
         year_str = f"({year})" if year else ""
 
-        # Format output
+        # Format series
         if type_ == "series":
             season_no = seasons[0] if seasons else 1
             if episodes:
@@ -42,10 +47,10 @@ def extract_caption(title: str) -> str:
             else:
                 ep_part = "Complete"
 
-            formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {resolution} {quality} {codec} {audio}".strip()
+            formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {resolution} {quality} {bit_depth} {codec} {audio} {channels}".strip()
 
         else:
-            formatted = f"{name} {year_str} {resolution} {quality} {codec} {audio}".strip()
+            formatted = f"{name} {year_str} {resolution} {quality} {bit_depth} {codec} {audio} {channels}".strip()
 
         # Clean multiple spaces
         formatted = " ".join(formatted.split())
