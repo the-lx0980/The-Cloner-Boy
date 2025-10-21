@@ -1,8 +1,7 @@
 import asyncio
 from pyrogram.errors import FloodWait
 from pyrogram import enums
-import logging
-import os
+from .tmdb_utils import extract_caption_parser
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     if message.media: 
@@ -21,7 +20,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 caption = None
 
             if ai_caption and caption:
-                caption = await extract_caption_ai(caption)
+                caption = await extract_caption_parser(caption)
 
             try:
                 await bot.send_cached_media(
