@@ -2,7 +2,7 @@ import tmdbsimple as tmdb
 import logging
 
 logger = logging.getLogger(__name__)
-tmdb.API_KEY = ""  # Set via env or config
+tmdb.API_KEY = "b043bef236e1b972f25dcb382ef1af76"  # Set via env or config
 
 def fetch_year_from_tmdb(title: str, type_: str = "movie") -> str:
     """
