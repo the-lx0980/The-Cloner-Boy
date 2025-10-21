@@ -2,10 +2,10 @@
 import os
 from itertools import cycle
 from openai import OpenAI
+from pyrogram import enums
+from pyrogram.errors import FloodWait
 
-# ───────────────────────────────
-# MULTI-API SETUP
-# ───────────────────────────────
+
 keys = os.environ.get("OPENAI_API_KEYS")
 if not keys:
     raise Exception("No OpenAI API keys found. Set OPENAI_API_KEYS in environment.")
@@ -106,7 +106,7 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
                     )
                 except FloodWait as e:
                     await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                    await forward_messages(bot, message, from_chat, to_chat, ai_caption):
+                    await forward_messages(bot, message, from_chat, to_chat, ai_caption)
     else:
         try:
             await bot.copy_message(
@@ -118,4 +118,4 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
             )
         except FloodWait as e:
             await asyncio.sleep(e.value)
-            await forward_messages(bot, message, from_chat, to_chat, ai_caption))
+            await forward_messages(bot, message, from_chat, to_chat, ai_caption)
