@@ -13,6 +13,7 @@ CHANNEL = {}
 CANCEL = {}
 DELAY = {}
 FORWARDING = {}
+AI_CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -103,7 +104,16 @@ async def set_delay_number(bot, message):
         return await message.reply("Only support in numbers.")
     DELAY[message.from_user.id] = int(delay)
     await message.reply(f"Successfully set <code>{delay}</code> delay in second.")
-
+    
+@Client.on_message(filters.private & filters.command(['ai_caption']))
+async def toggle_ai_caption(bot, message):
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply("Usage: /ai_caption on or /ai_caption off")
+    AI_CAPTION[user_id] = (parts[1].lower() == "on")
+    await message.reply(f"✅ AI Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
+    
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
