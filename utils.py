@@ -2,15 +2,7 @@ import os
 import asyncio
 import logging
 from itertools import cycle
-from openai import OpenAI
-from openai.error import (
-    APIError,
-    APIConnectionError,
-    RateLimitError,
-    AuthenticationError,
-    ServiceUnavailableError,
-    Timeout,
-)
+import openai
 from pyrogram.errors import FloodWait
 from pyrogram import enums
 
@@ -30,17 +22,17 @@ if not OPENAI_API_KEYS:
     raise Exception("❌ No valid API keys found.")
 
 if len(OPENAI_API_KEYS) == 1:
-    _ai_client = OpenAI(api_key=OPENAI_API_KEYS[0])
+    _ai_client = openai.OpenAI(api_key=OPENAI_API_KEYS[0])
 
-    def get_ai_client() -> OpenAI:
+    def get_ai_client() -> openai.OpenAI:
         """Return the single pre-initialized OpenAI client."""
         return _ai_client
     logger.info("🔑 Single API key mode enabled.")
 else:
-    _ai_clients = [OpenAI(api_key=k) for k in OPENAI_API_KEYS]
+    _ai_clients = [openai.OpenAI(api_key=k) for k in OPENAI_API_KEYS]
     _client_cycle = cycle(_ai_clients)
 
-    def get_ai_client() -> OpenAI:
+    def get_ai_client() -> openai.OpenAI:
         """Return the next OpenAI client (round-robin rotation)."""
         return next(_client_cycle)
     logger.info(f"🔁 Multi-key rotation enabled ({len(OPENAI_API_KEYS)} keys).")
@@ -67,7 +59,6 @@ Input caption:
 {caption}
 """
 
-    # Retry mechanism
     for attempt in range(3):
         try:
             logger.info(f"🧠 Sending caption to AI (attempt {attempt + 1})")
@@ -84,25 +75,37 @@ Input caption:
             logger.warning(f"⚠️ FloodWait: sleeping {e.value}s before retry.")
             await asyncio.sleep(e.value)
 
-        except RateLimitError as e:
-            logger.warning(f"🚫 Rate limit hit on key. Rotating key... ({e})")
+        except openai.RateLimitError as e:
+            logger.warning(f"🚫 Rate limit reached: {e.message}. Rotating key...")
             ai = get_ai_client()
-            await asyncio.sleep(1)
-
-        except AuthenticationError as e:
-            logger.error(f"❌ Invalid API key: {e}")
-            ai = get_ai_client()
-
-        except (APIConnectionError, Timeout) as e:
-            logger.warning(f"🌐 Connection issue: {e}. Retrying...")
             await asyncio.sleep(2)
 
-        except (APIError, ServiceUnavailableError) as e:
-            logger.warning(f"🧩 OpenAI internal error: {e}. Retrying after delay...")
+        except openai.AuthenticationError as e:
+            logger.error(f"❌ Invalid API key: {e.message}. Switching key.")
+            ai = get_ai_client()
+
+        except openai.PermissionDeniedError as e:
+            logger.error(f"🚷 Permission denied: {e.message}. Rotating key.")
+            ai = get_ai_client()
+
+        except openai.APIConnectionError as e:
+            logger.warning(f"🌐 Connection error: {e}. Retrying...")
             await asyncio.sleep(3)
 
+        except openai.InternalServerError as e:
+            logger.warning(f"🧩 Internal server error: {e.message}. Retrying...")
+            await asyncio.sleep(3)
+
+        except openai.ServiceUnavailableError as e:
+            logger.warning(f"🕒 Service unavailable: {e.message}. Retrying...")
+            await asyncio.sleep(3)
+
+        except openai.BadRequestError as e:
+            logger.error(f"⚠️ Bad request: {e.message}")
+            break
+
         except Exception as e:
-            logger.error(f"❌ Unexpected AI Caption Error: {e}")
+            logger.exception(f"❌ Unexpected AI Caption Error: {e}")
             await asyncio.sleep(2)
 
     logger.warning("⚠️ AI formatting failed after retries. Using original caption.")
