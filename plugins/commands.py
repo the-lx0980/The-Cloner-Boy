@@ -92,56 +92,55 @@ async def showid(client, message):
         await message.reply_text(f'★ Channel ID: <code>{message.chat.id}</code>')
 
 
-logger = logging.getLogger("ClearDBCommand")
 
-async def register_cleardb(client):
-    @client.on_message(filters.command("cleardb") & filters.private)
-    async def cleardb_command(client, message: Message):
-        if not collection:
-            await message.reply_text("⚠️ MongoDB connection not available.")
-            return
+@Client.on_message(filters.command("cleardb") & filters.private)
+async def cleardb_command(client: Client, message: Message):
+    if not collection:
+        await message.reply_text("⚠️ MongoDB connection not available.")
+        return
 
+    total_docs = collection.count_documents({})
+    if total_docs == 0:
+        await message.reply_text("📦 Database is already empty.")
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Confirm Delete", callback_data="confirm_delete"),
+                InlineKeyboardButton("❌ Cancel", callback_data="cancel_delete")
+            ]
+        ]
+    )
+
+    await message.reply_text(
+        f"⚠️ This will delete **all {total_docs} documents** from the database!\n\n"
+        "Do you want to continue?",
+        reply_markup=keyboard,
+        parse_mode="enums.ParseMode.MARKDOWN"
+    )
+
+
+@Client.on_callback_query()
+async def cleardb_callback(client, callback_query):
+    if not collection:
+        await callback_query.answer("⚠️ MongoDB not available.", show_alert=True)
+        return
+
+    if callback_query.data == "cancel_delete":
+        await callback_query.message.edit_text("❌ Deletion canceled.")
+        await callback_query.answer()
+        return
+
+    if callback_query.data == "confirm_delete":
         total_docs = collection.count_documents({})
         if total_docs == 0:
-            await message.reply_text("📦 Database is already empty.")
-            return
-
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("✅ Confirm Delete", callback_data="confirm_delete"),
-                    InlineKeyboardButton("❌ Cancel", callback_data="cancel_delete")
-                ]
-            ]
-        )
-
-        await message.reply_text(
-            f"⚠️ This will delete **all {total_docs} documents** from the database!\n\n"
-            "Do you want to continue?",
-            reply_markup=keyboard,
-            parse_mode="markdown"
-        )
-
-    @client.on_callback_query()
-    async def cleardb_callback(client, callback_query):
-        if not collection:
-            await callback_query.answer("⚠️ MongoDB not available.", show_alert=True)
-            return
-
-        if callback_query.data == "cancel_delete":
-            await callback_query.message.edit_text("❌ Deletion canceled.")
+            await callback_query.message.edit_text("📦 Database is already empty.")
             await callback_query.answer()
             return
 
-        if callback_query.data == "confirm_delete":
-            total_docs = collection.count_documents({})
-            if total_docs == 0:
-                await callback_query.message.edit_text("📦 Database is already empty.")
-                await callback_query.answer()
-                return
-
-            result = collection.delete_many({})
-            await callback_query.message.edit_text(
-                f"✅ Database cleaned successfully!\nDeleted {result.deleted_count} documents."
-            )
-            await callback_query.answer()
+        result = collection.delete_many({})
+        await callback_query.message.edit_text(
+            f"✅ Database cleaned successfully!\nDeleted {result.deleted_count} documents."
+        )
+        await callback_query.answer()
