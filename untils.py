@@ -1,0 +1,75 @@
+# ai_caption.py
+import os
+from itertools import cycle
+from openai import OpenAI
+
+# ───────────────────────────────
+# MULTI-API SETUP
+# ───────────────────────────────
+keys = os.environ.get("OPENAI_API_KEYS")
+if not keys:
+    raise Exception("No OpenAI API keys found. Set OPENAI_API_KEYS in environment.")
+
+OPENAI_API_KEYS = [k.strip() for k in keys.split(",") if k.strip()]
+if not OPENAI_API_KEYS:
+    raise Exception("No valid API keys found in OPENAI_API_KEYS.")
+
+# Round-robin cycle for sequential rotation
+_ai_key_cycle = cycle(OPENAI_API_KEYS)
+
+def get_ai_client() -> OpenAI:
+    """
+    Returns an OpenAI client with the next API key in the cycle.
+    """
+    key = next(_ai_key_cycle)
+    # Optional: print(f"🔑 Using OpenAI Key: {key[:8]}...")
+    return OpenAI(api_key=key)
+
+
+# ───────────────────────────────
+# AI CAPTION EXTRACTION
+# ───────────────────────────────
+async def extract_caption_ai(caption: str) -> str:
+    """
+    Send caption to OpenAI to clean & format for movie/series.
+    Returns formatted caption or original if AI fails.
+    """
+    ai = get_ai_client()
+    prompt = f"""
+You are a highly accurate movie and series caption formatter.
+
+Your task:
+1. Detect whether the caption is a movie or a series.
+2. Reformat details properly.
+
+Movies format:
+<Movie Name> (<Year>) <Quality> <Print> <Audio>
+
+Series format:
+<Series Name> (<Year>) S<SeasonNo:02d> [E<EpisodeNo:02d> or E<EpisodeRange>] <Quality> <Print> <Audio>
+
+Rules:
+- Season: S01, S02...
+- Episode: E01, E02...
+- Episode ranges: E01–E10
+- "Complete" after season if applicable
+- Audio: Dual Audio / Multi Audio formatting
+- Include print info (DDP 5.1, ORG) if present
+- No Markdown or emojis
+- Keep spacing clean
+- Skip missing/unknown fields
+
+Input caption:
+{caption}
+
+Return only the cleaned formatted caption.
+"""
+    try:
+        response = ai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print("AI Error:", e)
+        return caption
