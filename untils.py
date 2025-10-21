@@ -74,7 +74,7 @@ Return only the cleaned formatted caption.
         print("AI Error:", e)
         return caption
 
-async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
+async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     if message.media: 
         media_type = message.media.value
         media = getattr(message, media_type, None)
@@ -101,7 +101,7 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
                 )
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-                await forward_messages(bot, message, from_chat, to_chat, ai_caption)
+                await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
     else:
         try:
             await bot.copy_message(
@@ -113,4 +113,4 @@ async def forward_messages(bot, message, from_chat, to_chat, ai_caption):
             )
         except FloodWait as e:
             await asyncio.sleep(e.value)
-            await forward_messages(bot, message, from_chat, to_chat, ai_caption)
+            await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
