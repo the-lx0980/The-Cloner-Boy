@@ -115,7 +115,20 @@ def delete_media(title: str, season: int | None = None):
     collection.delete_one(query)
     logger.info(f"🗑️ Deleted record for {title} (Season {season if season else 'Movie'})")
 
-====================================================
+if collection:
+    try:
+        collection.create_index(
+            [("title", ASCENDING), ("season", ASCENDING), ("type", ASCENDING)],
+            unique=True
+        )
+        logger.info("🔒 Unique index created successfully.")
+    except Exception as e:
+        logger.warning(f"⚠️ Index creation skipped: {e}")
+
+
+# ====================================================
+# 📺 ANIME FUNCTIONS
+# ====================================================
 def save_anime(title: str, season: int, year: int):
     """Save or update anime info (title, season, year)"""
     if collection is None:
@@ -124,11 +137,13 @@ def save_anime(title: str, season: int, year: int):
     title = normalize_title(title)
     try:
         collection.update_one(
-            {"title": title, "season": season},
-            {"$set": {"year": year, "type": "anime"}},
+            {"title": title, "season": season, "type": "anime"},
+            {"$set": {"year": year}},
             upsert=True
         )
         logger.info(f"✅ Saved: {title.title()} S{season} → {year}")
+    except DuplicateKeyError:
+        logger.warning(f"⚠️ Duplicate entry ignored for {title.title()} S{season}")
     except Exception as e:
         logger.error(f"❌ Failed to save {title} S{season}: {e}")
 
@@ -155,8 +170,12 @@ def list_anime():
         return []
 
     docs = list(collection.find({"type": "anime"}, {"_id": 0}))
-    for d in docs:
-        print(f"📺 {d.get('title', '?').title()} (S{d.get('season')}) → {d.get('year')}")
+    if not docs:
+        print("📭 No anime saved yet.")
+    else:
+        print("📺 --- Saved Anime List ---")
+        for d in docs:
+            print(f"{d.get('title', '?').title()} (S{d.get('season')}) → {d.get('year')}")
     return docs
 
 
@@ -170,5 +189,8 @@ def delete_anime(title: str, season: int | None = None):
     if season:
         query["season"] = season
 
-    collection.delete_many(query)
-    logger.info(f"🗑️ Deleted {title.title()} (Season {season if season else 'All'})")
+    result = collection.delete_many(query)
+    if result.deleted_count > 0:
+        logger.info(f"🗑️ Deleted {result.deleted_count} record(s) for {title.title()} (S{season if season else 'All'})")
+    else:
+        logger.warning(f"⚠️ No record found for {title.title()} (S{season if season else 'All'})")
