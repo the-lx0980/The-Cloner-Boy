@@ -7,7 +7,7 @@ from .database import get_series_year, save_series_year
 logger = logging.getLogger("AIYearFetcher")
 
 # Load TMDB key from environment
-TMDB_API_KEY = ""
+TMDB_API_KEY = "b043bef236e1b972f25dcb382ef1af76"
 
 
 def fetch_series_year_tmdb(series_name: str, season_number: int) -> int | None:
