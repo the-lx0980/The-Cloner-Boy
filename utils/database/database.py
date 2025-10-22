@@ -114,3 +114,61 @@ def delete_media(title: str, season: int | None = None):
 
     collection.delete_one(query)
     logger.info(f"🗑️ Deleted record for {title} (Season {season if season else 'Movie'})")
+
+====================================================
+def save_anime(title: str, season: int, year: int):
+    """Save or update anime info (title, season, year)"""
+    if collection is None:
+        return
+
+    title = normalize_title(title)
+    try:
+        collection.update_one(
+            {"title": title, "season": season},
+            {"$set": {"year": year, "type": "anime"}},
+            upsert=True
+        )
+        logger.info(f"✅ Saved: {title.title()} S{season} → {year}")
+    except Exception as e:
+        logger.error(f"❌ Failed to save {title} S{season}: {e}")
+
+
+def get_anime_year(title: str, season: int) -> int | None:
+    """Fetch anime release year for a specific season"""
+    if collection is None:
+        return None
+
+    title = normalize_title(title)
+    data = collection.find_one({"title": title, "season": season, "type": "anime"})
+    if data:
+        logger.info(f"📅 {title.title()} S{season} → {data.get('year')}")
+        return data.get("year")
+    else:
+        logger.warning(f"⚠️ No data found for {title.title()} S{season}")
+        return None
+
+
+def list_anime():
+    """List all saved anime"""
+    if collection is None:
+        print("⚠️ No MongoDB connection.")
+        return []
+
+    docs = list(collection.find({"type": "anime"}, {"_id": 0}))
+    for d in docs:
+        print(f"📺 {d.get('title', '?').title()} (S{d.get('season')}) → {d.get('year')}")
+    return docs
+
+
+def delete_anime(title: str, season: int | None = None):
+    """Delete anime entry"""
+    if collection is None:
+        return
+
+    title = normalize_title(title)
+    query = {"title": title, "type": "anime"}
+    if season:
+        query["season"] = season
+
+    collection.delete_many(query)
+    logger.info(f"🗑️ Deleted {title.title()} (Season {season if season else 'All'})")
