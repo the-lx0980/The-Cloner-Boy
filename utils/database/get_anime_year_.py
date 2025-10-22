@@ -3,7 +3,7 @@ import requests
 
 ANILIST_API_URL = "https://graphql.anilist.co"
 
-def generate_search_titles(title: str, season_number: int):
+def get_anime_year(title: str, season_number: int):
     base_variations = [
         f"{title} Season {season_number}",
         f"{title} Part {season_number}",
@@ -88,3 +88,17 @@ def get_anime_season_year(title: str, season_number: int) -> int | None:
 
     logger.warning(f"❌ No data found for '{title}' Season {season_number}")
     return None
+
+async def get_or_fetch_anime_year(title: str, season: int) -> int | None:
+    """
+    1. Check MongoDB first.
+    2. If missing, ask AI.
+    3. Store result automatically.
+    """
+    year = get_series_year(title, season)
+    if year:
+        logger.info(f"📦 Found in DB: {title} S{season} → {year}")
+        return year
+
+    logger.info(f"🔍 Year missing for {title} S{season}, fetching via AI...")
+    return await get_anime_year(title, season)
