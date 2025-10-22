@@ -1,9 +1,12 @@
 import logging
 import requests
+from database import save_anime, get_anime_year
 
 ANILIST_API_URL = "https://graphql.anilist.co"
 
 def get_anime_year(title: str, season_number: int):
+    str_title = title
+    str_sesion = season_number
     base_variations = [
         f"{title} Season {season_number}",
         f"{title} Part {season_number}",
@@ -82,6 +85,7 @@ def get_anime_season_year(title: str, season_number: int) -> int | None:
                         logger.info(f"✅ {title_out} ({year})")
                     else:
                         logger.info(f"✅ {title_out} Season {season_number}: {year}")
+                    save_anime(str_title, str_sesion, year)
                     return year
         except requests.RequestException:
             continue
@@ -92,10 +96,10 @@ def get_anime_season_year(title: str, season_number: int) -> int | None:
 async def get_or_fetch_anime_year(title: str, season: int) -> int | None:
     """
     1. Check MongoDB first.
-    2. If missing, ask AI.
+    2. If missing, get year
     3. Store result automatically.
     """
-    year = get_series_year(title, season)
+    year = get_anime_year(title, season)
     if year:
         logger.info(f"📦 Found in DB: {title} S{season} → {year}")
         return year
