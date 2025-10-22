@@ -2,96 +2,66 @@ import os
 import re
 import asyncio
 import logging
-from itertools import cycle
-import openai
+from tmdbv3api import TMDb, TV, Season
+import datetime
 
 from .database import get_series_year, save_series_year
 
 logger = logging.getLogger("AIYearFetcher")
 
-# -------------------------------
-# OpenAI Key Setup
-# -------------------------------
-keys = os.environ.get("OPENAI_API_KEYS") or os.environ.get("OPENAI_API_KEY")
-
-if not keys:
-    raise Exception("❌ No OpenAI API keys found. Please set OPENAI_API_KEYS or OPENAI_API_KEY.")
-
-OPENAI_API_KEYS = [k.strip() for k in keys.split(",") if k.strip()]
-if not OPENAI_API_KEYS:
-    raise Exception("❌ No valid API keys provided.")
-
-if len(OPENAI_API_KEYS) == 1:
-    _ai_client = openai.OpenAI(api_key=OPENAI_API_KEYS[0])
-
-    def get_ai_client() -> openai.OpenAI:
-        return _ai_client
-else:
-    _ai_clients = [openai.OpenAI(api_key=k) for k in OPENAI_API_KEYS]
-    _client_cycle = cycle(_ai_clients)
-
-    def get_ai_client() -> openai.OpenAI:
-        return next(_client_cycle)
 
 
-# -------------------------------
-# AI Fetch Function
-# -------------------------------
-async def fetch_series_year_ai(title: str, season: int) -> int | None:
+def get_season_release_year_robust(series_name, season_number):
     """
-    Ask AI: "What is the release year of <series> Season <season>?"
-    Returns 4-digit year or None.
+    Finds the accurate release year for a specific season of a TV series.
+    
+    Args:
+        series_name (str): The name of the series (e.g., "The Crown").
+        season_number (int): The season number (e.g., 4).
+        api_key (str): Your TMDb API key.
+        
+    Returns:
+        str: The release year or a descriptive error message.
     """
-    ai = get_ai_client()
-    prompt = f"""
-You are a film and TV database expert.
-Return ONLY the 4-digit release year of the given season.
-If unknown, say "unknown".
+    tmdb = TMDb()
+    tmdb.api_key = api_key
+    tmdb.language = "en"
+    
+    tv = TV()
+    season = Season()
 
-Series Name: {title}
-Season: {season}
-"""
+    try:
+        # 1️⃣ Search for the TV series
+        search_results = tv.search(series_name)
+        if not search_results:
+            return f"❌ Series '{series_name}' not found on TMDb."
 
-    for attempt in range(3):
-        try:
-            logger.info(f"🧠 Fetching year via AI → {title} S{season} (attempt {attempt + 1})")
+        # Use first match (most relevant)
+        series = search_results[0]
+        series_id = series.id
 
-            response = ai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                timeout=20,
-            )
+        # 2️⃣ Fetch season details
+        season_details = season.details(series_id, season_number)
+        air_date = getattr(season_details, "air_date", None)
 
-            answer = response.choices[0].message.content.strip()
-            match = re.search(r"\b(19|20)\d{2}\b", answer)
-            if match:
-                year = int(match.group(0))
-                save_series_year(title, season, year)
-                logger.info(f"✅ AI found year: {title} S{season} → {year}")
-                return year
-            else:
-                logger.warning(f"⚠️ AI could not detect year for {title} S{season}: {answer}")
-                return None
+        # 3️⃣ Extract and format year
+        if air_date:
+            try:
+                release_date = datetime.datetime.strptime(air_date, "%Y-%m-%d")
+                return str(release_date.year)
+                save_series_year()
+            except ValueError:
+                return f"⚠️ Invalid air_date format for season {season_number} of '{series_name}'."
+        else:
+            return f"ℹ️ No air date found for season {season_number} of '{series_name}'."
 
-        except openai.RateLimitError:
-            logger.warning("🚫 Rate limit hit — rotating key...")
-            ai = get_ai_client()
-            await asyncio.sleep(2)
+    except Exception as e:
+        return f"⚠️ Error fetching details for '{series_name}' (Season {season_number}): {e}"
 
-        except Exception as e:
-            logger.exception(f"❌ AI fetch failed: {e}")
-            await asyncio.sleep(2)
-
-    return None
-
-
-# -------------------------------
-# Auto Wrapper (DB + AI)
-# -------------------------------
 async def get_or_fetch_series_year(title: str, season: int) -> int | None:
     """
     1. Check MongoDB first.
-    2. If missing, ask AI.
+    2. If missing, get
     3. Store result automatically.
     """
     year = get_series_year(title, season)
