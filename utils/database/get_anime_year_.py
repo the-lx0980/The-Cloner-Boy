@@ -1,3 +1,4 @@
+"""
 import logging
 import requests
 from database import save_anime, get_anime_year as db_get_anime_year
@@ -111,3 +112,4 @@ def get_or_fetch_anime_year(title: str, season: int) -> int | None:
 
     logger.info(f"🔍 Fetching from AniList for {title} S{season}...")
     return fetch_anime_year(title, season)
+"""
