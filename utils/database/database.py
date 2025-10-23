@@ -69,8 +69,8 @@ def create_unique_index(collection: Optional[Collection]) -> None:
     except Exception as e:
         logger.warning(f"⚠️ Index creation skipped: {e}")
 
-if collection:
-    create_unique_index(collection)
+if collection is not None:
+    create_unique_index(collection):
 
 # -------------------------------
 # 🧠 Common Helpers
