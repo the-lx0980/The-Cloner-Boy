@@ -92,6 +92,8 @@ async def showid(client, message):
 
 @Client.on_message(filters.command("cleardb") & filters.private)
 async def cleardb_command(client: Client, message: Message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This Bot")
     if collection is None:
         await message.reply_text("⚠️ MongoDB connection not available.")
         return
