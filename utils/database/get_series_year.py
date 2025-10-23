@@ -8,48 +8,58 @@ from .database import get_series_year, save_series_year
 
 logger = logging.getLogger("AIYearFetcher")
 
-# Load TMDB key from environment
-TMDB_API_KEY = "b043bef236e1b972f25dcb382ef1af76"
+# Load TMDB key
+TMDB_API_KEY = os.getenv("TMDB_API_KEY", "b043bef236e1b972f25dcb382ef1af76")
 
-async def get_season_release_year_robust(series_name, season_number, api_key, retries=3):
+# ───────────────────────────────
+# TMDb robust fetch function
+# ───────────────────────────────
+async def get_season_release_year_robust(series_name: str, season_number: int, api_key: str, retries: int = 3) -> int | None:
     tmdb = TMDb()
-    tmdb.api_key = TMDB_API_KEY
+    tmdb.api_key = api_key
     tmdb.language = "en"
     
     tv = TV()
     season = Season()
+
     for attempt in range(1, retries + 1):
-            try:
-                search_results = tv.search(series_name)
-                if not search_results:
-                    continue
-
-                series_id = search_results[0].id
-                season_details = season.details(series_id, season_number)
-                air_date = getattr(season_details, "air_date", None)
-
-                if air_date:
-                    return str(datetime.datetime.strptime(air_date, "%Y-%m-%d").year)                 
-                else:
-                    return f"ℹ️ No air date for '{series_name}' Season {season_number}."
-            
-            except requests.exceptions.ConnectionError as e:
-                print(f"⚠️ Network error (attempt {attempt}/{retries}): {e}")
-                await asyncio.sleep(5)
+        try:
+            search_results = tv.search(series_name)
+            if not search_results:
+                logger.warning(f"🔎 No TMDb results for '{series_name}' (attempt {attempt}/{retries})")
+                await asyncio.sleep(2)
                 continue
-            
-            except Exception as e:
-                # 404 error => try next title
-                if "could not be found" in str(e):
-                    break
-                else:
-                    return f"⚠️ Error fetching '{series_name}' season {season_number}: {e}"
 
-    return f"❌ No valid data found for '{series_name}' season {season_number}."
+            series_id = search_results[0].id
+            season_details = season.details(series_id, season_number)
+            air_date = getattr(season_details, "air_date", None)
 
-# ---------------------------
-# Async wrapper to check DB first
-# ---------------------------
+            if air_date:
+                year = datetime.datetime.strptime(air_date, "%Y-%m-%d").year
+                return year
+            else:
+                logger.info(f"ℹ️ No air date for '{series_name}' Season {season_number}")
+                return None
+
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"⚠️ Network error (attempt {attempt}/{retries}): {e}")
+            await asyncio.sleep(5)
+
+        except Exception as e:
+            if "could not be found" in str(e).lower():
+                logger.error(f"🚫 Series not found: {series_name} S{season_number}")
+                break
+            else:
+                logger.error(f"⚠️ Error fetching '{series_name}' S{season_number}: {e}")
+                return None
+
+    logger.error(f"❌ No valid data found for '{series_name}' Season {season_number}")
+    return None
+
+
+# ───────────────────────────────
+# DB + TMDb Wrapper
+# ───────────────────────────────
 async def get_or_fetch_series_year(title: str, season: int) -> int | None:
     """
     1️⃣ Check MongoDB first.
@@ -64,8 +74,12 @@ async def get_or_fetch_series_year(title: str, season: int) -> int | None:
 
     # 2️⃣ Fetch from TMDb
     logger.info(f"🔍 Year missing for {title} S{season}, fetching from TMDb...")
-    year = await get_season_release_year_robust(str(title), int(season))
-    if year:
-        # 3️⃣ Save to DB
-        save_series_year(title, int(season), int(year))
-    return year
+    year = await get_season_release_year_robust(title, season, TMDB_API_KEY)
+    
+    # 3️⃣ Save if valid
+    if isinstance(year, int):
+        save_series_year(title, season, year)
+        logger.info(f"💾 Saved to DB: {title} S{season} → {year}")
+        return year
+    
+    return None
