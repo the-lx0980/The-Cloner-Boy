@@ -4,7 +4,7 @@ https://github.com/the-lx0980/pyromod/archive/refs/heads/master.zip
 tmdbsimple 
 requests
 parsett
-openai
+python-dotenv
 pymongo
 Flask==3.0.0
 gunicorn==21.2.0
