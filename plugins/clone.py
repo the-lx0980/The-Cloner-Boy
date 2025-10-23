@@ -13,7 +13,7 @@ CHANNEL = {}
 CANCEL = {}
 DELAY = {}
 FORWARDING = {}
-AI_CAPTION = {}
+PARSE_CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -114,9 +114,9 @@ async def parse_caption(bot, message):
     user_id = message.from_user.id
     parts = message.text.split(" ")
     if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
-        return await message.reply("Usage: /ai_caption on or /ai_caption off")
-    AI_CAPTION[user_id] = (parts[1].lower() == "on")
-    await message.reply(f"✅ AI Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
+        return await message.reply("Usage: /parse_caption on or /parse_caption off")
+    PARSE_CAPTION[user_id] = (parts[1].lower() == "on")
+    await message.reply(f"✅ Parse Caption Formatter is now <b>{'ENABLED' if PARSE_CAPTION[user_id] else 'DISABLED'}</b>")
     
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
@@ -150,7 +150,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     FORWARDING[user_id] = True
     from_chat = chat
     to_chat = CHANNEL.get(user_id)
-    ai_caption = AI_CAPTION.get(user_id, False)
+    parse_caption = PARSE_CAPTION.get(user_id, False)
     # lst_msg_id is same to total messages
 
     try:
@@ -166,7 +166,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
+                await forwards_messages(bot, message, from_chat, to_chat, parse_caption)
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
