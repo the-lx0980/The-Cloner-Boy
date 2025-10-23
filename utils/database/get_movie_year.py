@@ -15,7 +15,7 @@ logger = logging.getLogger("MovieYearFetcher")
 tmdb.API_KEY = TMDB_API_KEY
 
 
-def fetch_movie_year_tmdb(title: str) -> int | None:
+async def fetch_movie_year_tmdb(title: str) -> int | None:
     """
     Synchronous TMDb fetch.
     """
