@@ -1,66 +1,50 @@
 import logging
 import re
 from PTT import parse_title
-import asyncio
-from .database import (
-    get_or_fetch_series_year,
-    get_or_fetch_movie_year
-)
+from .database import get_or_fetch_series_year, get_or_fetch_movie_year
 
 logger = logging.getLogger(__name__)
 
-
-async def extract_caption(title: str) -> str:
+def extract_caption(title: str) -> str:
     """
-    Parse torrent title using Parsett (PTT) with:
-    - Correct resolution/source override
-    - Auto fetch release year if missing
-    - TMDb for movies, TMDb for series, AniList for anime
+    Parse torrent title using Parsett (PTT) with corrected resolution/source override priority.
+    Fetches missing year from database if not present in title.
     """
     if not title or len(title.strip()) < 3:
-        return title.strip()
+        return title
 
     try:
         data = parse_title(title, translate_languages=True)
-        name = data.get("title", "").strip()
+        name = data.get("title") or ""
         year = data.get("year")
         seasons = data.get("seasons") or []
         episodes = data.get("episodes") or []
+        type_ = "series" if seasons else "movie"
+
+        # Fetch year if missing
+        if not year:
+            if type_ == "series":
+                season_no = seasons[0] if seasons else 1
+                year = get_or_fetch_series_year(name, season_no)
+            else:
+                year = get_or_fetch_movie_year(name)
+
+        # Base values from PTT
         resolution = data.get("resolution", "")
         quality = data.get("quality", "")
-        codec = (data.get("codec") or "").lower()
+        codec = (data.get("codec", "") or "").lower()
         bit_depth = data.get("bit_depth", "")
         channels_list = data.get("channels", [])
-        audio_list = data.get("audio", [])
-        languages = data.get("languages", [])
+        channels = ", ".join(channels_list)
 
-        # Determine type (anime / series / movie)
-        lower_name = name.lower()
-        if seasons:
-            type_ = "series"
-        else:
-            type_ = "movie"
-
-        # --- Auto fetch missing year ---
-        if not year:
-            if type_ == "anime":
-                season_no = seasons[0] if seasons else 1
-                year = await get_or_fetch_anime_year(name, season_no)
-            elif type_ == "series":
-                season_no = seasons[0] if seasons else 1
-                year = await get_or_fetch_series_year(name, season_no)
-            else:
-                year = await get_or_fetch_movie_year(name)
-
-        year_str = f"({year})" if year else ""
-
-        # --- Resolution ---
         t_lower = title.lower()
+
+        # ✅ 1. Resolution Manual Fix (takes priority)
         match_res = re.search(r"(480p|720p|1080p|2160p|4k)", t_lower)
         if match_res:
             resolution = match_res.group(1)
 
-        # --- Source Detection ---
+        # ✅ 2. Source Detection (NF / AMZN / WEBRip / HDRip / BluRay / DS4K)
         source_tags = [
             ("ds4k", "DS4K"),
             ("nf", "NF"),
@@ -71,61 +55,71 @@ async def extract_caption(title: str) -> str:
             ("bluray", "BluRay"),
             ("bdrip", "BDRip")
         ]
-        source = next((name_ for tag, name_ in source_tags if tag in t_lower), "")
-        quality_final = " ".join(filter(None, [source, quality]))
+        source = ""
+        for tag, name_ in source_tags:
+            if tag in t_lower:
+                source = name_
+                break
 
-        # --- Audio Formatting ---
+        # ✅ 3. Combine source + quality properly
+        quality_final = source if source else ""
+        if quality and source.lower() not in quality.lower():
+            quality_final = f"{quality_final} {quality}".strip()
+
+        # --- Audio + Language Formatting ---
+        audio_list = data.get("audio", [])
+        languages = data.get("languages", [])
+
         def clean_audio_name(name: str) -> str:
-            replacements = {
-                "Dolby Digital Plus": "DD+",
-                "Dolby Digital": "DD",
-                "Dolby TrueHD": "TrueHD",
-                "Dolby Atmos": "Atmos",
-                "DTS-HD MA": "DTS HD MA"
-            }
-            for k, v in replacements.items():
-                name = name.replace(k, v)
+            name = name.replace("Dolby Digital Plus", "DD+")
+            name = name.replace("Dolby Digital", "DD")
+            name = name.replace("Dolby TrueHD", "TrueHD")
+            name = name.replace("Dolby Atmos", "Atmos")
+            name = name.replace("DTS-HD MA", "DTS HD MA")
             return name.strip()
 
         audio_list = [clean_audio_name(a) for a in audio_list]
-        audio_fmt = next((fmt for fmt in ["Atmos", "TrueHD", "DD+", "DD", "DTS HD MA", "AAC", "FLAC"]
-                          if any(fmt.lower() in a.lower() for a in audio_list)), "")
 
-        if channels_list and audio_fmt:
-            audio_fmt = f"{audio_fmt} {channels_list[0]}"
+        # Audio format priority
+        audio_fmt = ""
+        for fmt in ["Atmos", "TrueHD", "DD+", "DD", "DTS HD MA", "AAC", "FLAC"]:
+            if any(fmt.lower() in a.lower() for a in audio_list):
+                audio_fmt = fmt
+                break
 
+        # Add channels
+        if channels_list:
+            ch_info = channels_list[0]
+            if audio_fmt:
+                audio_fmt = f"{audio_fmt} {ch_info}"
+
+        # --- Language Format ---
         if languages:
             lang_text = " + ".join(languages)
             audio_lang = f"Multi Audio ({lang_text})" if len(languages) > 1 else languages[0]
         else:
             audio_lang = ""
 
-        # --- Final Caption Format ---
-        if type_ in ["series", "anime"]:
+        # --- Year format ---
+        year_str = f"({year})" if year else ""
+
+        # --- Final caption ---
+        if type_ == "series":
             season_no = seasons[0] if seasons else 1
             if episodes:
-                ep_part = (
-                    f"E{episodes[0]:02d}" if len(episodes) == 1
-                    else f"E{episodes[0]:02d}–E{episodes[-1]:02d}"
-                )
+                ep_part = f"E{episodes[0]:02d}" if len(episodes) == 1 else f"E{episodes[0]:02d}–E{episodes[-1]:02d}"
             else:
                 ep_part = "Complete"
-            formatted = (
-                f"{name} {year_str} S{season_no:02d} {ep_part} "
-                f"{resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
-            )
+            formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
         else:
-            formatted = (
-                f"{name} {year_str} {resolution} {quality_final} "
-                f"{bit_depth} {codec} {audio_fmt} {audio_lang}"
-            )
+            formatted = f"{name} {year_str} {resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
 
-        # Append file extension if missing
+        # ✅ Ensure correct extension
         if not re.search(r"\.(mkv|mp4|avi|mov)$", formatted, re.I):
             formatted += " .mkv"
 
         return " ".join(formatted.split())
 
     except Exception as e:
-        logger.exception(f"❌ Caption extraction failed: {e}")
+        logger.exception(f"Caption extraction failed: {e}")
         return title
