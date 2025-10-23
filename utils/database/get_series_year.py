@@ -20,12 +20,13 @@ async def get_season_release_year_robust(series_name: str, season_number: int, a
     tv = TV()
     season = Season()
 
+    await asyncio.sleep(5)
     for attempt in range(1, retries + 1):
         try:
             search_results = tv.search(series_name)
             if not search_results:
                 logger.warning(f"🔎 No TMDb results for '{series_name}' (attempt {attempt}/{retries})")
-                await asyncio.sleep(2)
+                await asyncio.sleep(5)
                 continue
 
             series_id = search_results[0].id
