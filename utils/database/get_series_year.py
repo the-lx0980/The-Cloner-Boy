@@ -30,9 +30,12 @@ def get_season_release_year_robust(series_name, season_number, retries=5):
 
             series_id = search_results[0].id
             season_details = season.details(series_id, season_number)
-            # Handle dict or object
-            air_date = getattr(season_details, "air_date", None) if not isinstance(season_details, dict) else season_details.get("air_date")
 
+            # Convert to dict if it's an object
+            if not isinstance(season_details, dict):
+                season_details = season_details.__dict__
+
+            air_date = season_details.get("air_date")
             if air_date:
                 year = int(datetime.datetime.strptime(air_date, "%Y-%m-%d").year)
                 logger.info(f"✅ {series_name} S{season_number}: {year}")
