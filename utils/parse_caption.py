@@ -1,7 +1,7 @@
 import logging
 import re
 from PTT import parse_title
-#from .database import get_or_fetch_series_year, get_or_fetch_movie_year
+from .database import get_or_fetch_series_year, get_or_fetch_movie_year
 
 logger = logging.getLogger(__name__)
 
