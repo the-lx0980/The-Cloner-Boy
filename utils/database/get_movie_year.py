@@ -1,14 +1,18 @@
 import logging
 import asyncio
+import random
 from .database import get_movie_year, save_movie_year
 import tmdbsimple as tmdb
 import re
 from PTT import parse_title
+from utils.tmdb_utils import tmdbapi
+
+TMDB_API_KEY = random.choice(tmdbapi)
 
 logger = logging.getLogger("MovieYearFetcher")
 
 # Set your TMDb API key
-tmdb.API_KEY = "b043bef236e1b972f25dcb382ef1af76"
+tmdb.API_KEY = TMDB_API_KEY
 
 
 def fetch_movie_year_tmdb(title: str) -> int | None:
