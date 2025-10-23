@@ -4,8 +4,7 @@ from PTT import parse_title
 import asyncio
 from .database import (
     get_or_fetch_series_year,
-    get_or_fetch_movie_year,
-    get_or_fetch_anime_year,
+    get_or_fetch_movie_year
 )
 
 logger = logging.getLogger(__name__)
@@ -37,12 +36,7 @@ async def extract_caption(title: str) -> str:
 
         # Determine type (anime / series / movie)
         lower_name = name.lower()
-        if any(anime_key in lower_name for anime_key in [
-            "naruto", "attack on titan", "jujutsu kaisen", "demon slayer",
-            "my hero academia", "bleach", "one piece", "tokyo ghoul", "chainsaw man"
-        ]):
-            type_ = "anime"
-        elif seasons:
+        if seasons:
             type_ = "series"
         else:
             type_ = "movie"
