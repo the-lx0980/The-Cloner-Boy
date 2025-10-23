@@ -23,7 +23,7 @@ I can forward **documents** and **videos** (mp4/mkv) from a source channel to yo
 /set_skip <number> - Skip first messages.
 /set_channel <channel_id> - Set target channel.
 /set_delay <seconds> - Set delay between forwards.
-/ai_caption on/off - Enable/disable AI caption formatting.
+/parse_caption on/off - Enable/disable parse caption formatting.
 /stop - restart the bot.
 /id - get users id and chat id. 
 
