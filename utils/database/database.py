@@ -50,7 +50,7 @@ def create_unique_index(col: Collection) -> None:
     except Exception as e:
         logger.warning(f"⚠️ Index creation skipped: {e}")
 
-if collection:
+if collection is None::
     create_unique_index(collection)
 
 # -------------------------------
