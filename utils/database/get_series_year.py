@@ -1,6 +1,8 @@
 import os
 import datetime
 import logging
+import requests
+import urllib3
 from tmdbv3api import TMDb, TV, Season
 from .database import get_series_year, save_series_year
 
