@@ -1,6 +1,7 @@
 import os
 import datetime
 import logging
+import time
 import requests
 import urllib3
 from tmdbv3api import TMDb, TV, Season
@@ -20,43 +21,42 @@ def get_season_release_year_robust(series_name, season_number, retries=5):
     tv = TV()
     season = Season()
 
-    titles_to_try = ALT_TITLES.get(series_name, [series_name])
-
-    for name in titles_to_try:
-        for attempt in range(1, retries + 1):
-            try:
-                search_results = tv.search(name)
-                if not search_results:
-                    break  # No results for this title, try next
-
-                series_id = search_results[0].id
-                season_details = season.details(series_id, season_number)
-                # Handle dict or object
-                air_date = getattr(season_details, "air_date", None) if not isinstance(season_details, dict) else season_details.get("air_date")
-
-                if air_date:
-                    year = int(datetime.datetime.strptime(air_date, "%Y-%m-%d").year)
-                    logger.info(f"✅ {series_name} S{season_number}: {year}")
-                    return year
-                else:
-                    logger.warning(f"ℹ️ No air date for '{series_name}' Season {season_number}.")
-                    return None
-
-            except (requests.exceptions.ConnectionError,
-                    urllib3.exceptions.ProtocolError,
-                    ConnectionResetError) as e:
-                logger.warning(f"⚠️ Network error (attempt {attempt}/{retries}) for '{series_name}' S{season_number}: {e}")
-                time.sleep(2 ** attempt)  # exponential backoff
-                continue
-
-            except Exception as e:
-                if "could not be found" in str(e).lower():
-                    break
-                logger.error(f"⚠️ Error fetching '{series_name}' season {season_number}: {e}")
+    for attempt in range(1, retries + 1):
+        try:
+            search_results = tv.search(series_name)
+            if not search_results:
+                logger.error(f"❌ No search results for '{series_name}'.")
                 return None
+
+            series_id = search_results[0].id
+            season_details = season.details(series_id, season_number)
+            # Handle dict or object
+            air_date = getattr(season_details, "air_date", None) if not isinstance(season_details, dict) else season_details.get("air_date")
+
+            if air_date:
+                year = int(datetime.datetime.strptime(air_date, "%Y-%m-%d").year)
+                logger.info(f"✅ {series_name} S{season_number}: {year}")
+                return year
+            else:
+                logger.warning(f"ℹ️ No air date for '{series_name}' Season {season_number}.")
+                return None
+
+        except (requests.exceptions.ConnectionError,
+                urllib3.exceptions.ProtocolError,
+                ConnectionResetError) as e:
+            logger.warning(f"⚠️ Network error (attempt {attempt}/{retries}) for '{series_name}' S{season_number}: {e}")
+            time.sleep(2 ** attempt)  # exponential backoff
+            continue
+
+        except Exception as e:
+            if "could not be found" in str(e).lower():
+                break
+            logger.error(f"⚠️ Error fetching '{series_name}' season {season_number}: {e}")
+            return None
 
     logger.error(f"❌ No valid data found for '{series_name}' season {season_number}.")
     return None
+
 
 # ---------------------------
 # Async wrapper to check DB first
