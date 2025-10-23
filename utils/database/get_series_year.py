@@ -11,7 +11,7 @@ logger = logging.getLogger("AIYearFetcher")
 # Load TMDB key from environment
 TMDB_API_KEY = "b043bef236e1b972f25dcb382ef1af76"
 
-def get_season_release_year_robust(series_name, season_number, api_key, retries=3):
+async def get_season_release_year_robust(series_name, season_number, api_key, retries=3):
     tmdb = TMDb()
     tmdb.api_key = TMDB_API_KEY
     tmdb.language = "en"
@@ -35,7 +35,7 @@ def get_season_release_year_robust(series_name, season_number, api_key, retries=
             
             except requests.exceptions.ConnectionError as e:
                 print(f"⚠️ Network error (attempt {attempt}/{retries}): {e}")
-                asyncio.sleep(5)
+                await asyncio.sleep(5)
                 continue
             
             except Exception as e:
@@ -64,7 +64,7 @@ async def get_or_fetch_series_year(title: str, season: int) -> int | None:
 
     # 2️⃣ Fetch from TMDb
     logger.info(f"🔍 Year missing for {title} S{season}, fetching from TMDb...")
-    year = get_season_release_year_robust(str(title), int(season))
+    year = await get_season_release_year_robust(str(title), int(season))
     if year:
         # 3️⃣ Save to DB
         save_series_year(title, int(season), int(year))
