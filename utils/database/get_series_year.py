@@ -1,16 +1,14 @@
-import os
+import random
 import datetime
 import logging
 from tmdbv3api import TMDb, TV, Season
 import requests
 import asyncio
 from .database import get_series_year, save_series_year
-
+from utils.tmdb_utils import tmdbapi
 logger = logging.getLogger("AIYearFetcher")
 
-# Load TMDB key
-TMDB_API_KEY = os.getenv("TMDB_API_KEY", "b043bef236e1b972f25dcb382ef1af76")
-
+TMDB_API_KEY = random.choice(tmdbapi)
 # ───────────────────────────────
 # TMDb robust fetch function
 # ───────────────────────────────
