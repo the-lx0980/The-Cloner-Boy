@@ -81,6 +81,8 @@ async def send_for_forward(bot, message):
                     
 @Client.on_message(filters.private & filters.command(['set_skip']))
 async def set_skip_number(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
     try:
         _, skip = message.text.split(" ")
     except:
@@ -105,8 +107,10 @@ async def set_delay_number(bot, message):
     DELAY[message.from_user.id] = int(delay)
     await message.reply(f"Successfully set <code>{delay}</code> delay in second.")
     
-@Client.on_message(filters.private & filters.command(['ai_caption']))
-async def toggle_ai_caption(bot, message):
+@Client.on_message(filters.private & filters.command(['parse_caption']))
+async def parse_caption(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
     user_id = message.from_user.id
     parts = message.text.split(" ")
     if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
