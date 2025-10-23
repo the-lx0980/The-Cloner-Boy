@@ -19,6 +19,7 @@ def fetch_movie_year_tmdb(title: str) -> int | None:
     """
     Synchronous TMDb fetch.
     """
+    await asyncio.sleep(5)
     try:
         search = tmdb.Search()
         response = search.movie(query=title)
