@@ -25,9 +25,9 @@ def extract_caption(title: str) -> str:
         if not year:
             if type_ == "series":
                 season_no = seasons[0] if seasons else 1
-                year = get_or_fetch_series_year(name, season_no)
+                year = await get_or_fetch_series_year(name, season_no)
             else:
-                year = get_or_fetch_movie_year(name)
+                year = await get_or_fetch_movie_year(name)
 
         # Base values from PTT
         resolution = data.get("resolution", "")
