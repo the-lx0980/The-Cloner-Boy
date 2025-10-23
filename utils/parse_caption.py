@@ -5,7 +5,7 @@ from .database import get_or_fetch_series_year, get_or_fetch_movie_year
 
 logger = logging.getLogger(__name__)
 
-def extract_caption(title: str) -> str:
+async def extract_caption(title: str) -> str:
     if not title or len(title.strip()) < 3:
         return title
 
