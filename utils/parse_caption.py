@@ -83,9 +83,7 @@ async def extract_caption(title: str) -> str:
                 ep_part = (f"E{episodes[0]:02d}" if len(episodes) == 1
                            else f"E{episodes[0]:02d} – E{episodes[-1]:02d}")
             else:
-                ep_part = "Complete"
-            if ep_part == "Complete":
-                ep_part = "E01 Complete"             
+                ep_part = "Complete_"             
             formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {components_clean}"
         else:
             formatted = f"{name} {year_str} {components_clean}"
