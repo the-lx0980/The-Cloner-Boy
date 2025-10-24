@@ -17,6 +17,10 @@ Forward your source channel message to this bot. If source channel is forward re
 /set_skip - Set skip message.
 /set_channel - Set target channel.
 
+/copy_series_only - on/off- Forward only series. 
+/copy_movies_only - on/off - Forward only movies.
+/forwardall - on/off Forward all video's or documents
+
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
     await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")
 
@@ -31,6 +35,17 @@ async def stop_button(bot, m):
     await asyncio.sleep(1)
     await msg.edit("All Processes Stopped and Restarted")
     os.execl(sys.executable, sys.executable, *sys.argv)
+
+@Client.on_message(filters.private & filters.command(['send']))
+async def sendmsg(bot, message):    
+    if a.ADMINS and not ((str(message.from_user.id) in a.ADMINS) or (message.from_user.username in a.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot") 
+    await bot.send_message(
+        text = "Dune 2",
+        chat_id = -1002268099451
+    )
+    await asyncio.sleep(1)
+    await message.reply('Message send to source chat successfully')
 
 @Client.on_message(filters.command('id'))
 async def showid(client, message):

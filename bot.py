@@ -1,6 +1,5 @@
 import logging
 import logging.config
-
 # Get logging configurations
 logging.config.fileConfig('logging.conf')
 logging.getLogger().setLevel(logging.INFO)
@@ -17,25 +16,24 @@ from config import Config
 
 
 class Bot(Client):
-
     def __init__(self):
         super().__init__(
             name="bot_session",
             api_hash=Config.API_HASH,
             api_id=Config.APP_ID,
-            bot_token=Config.TG_BOT_TOKEN,
-            sleep_threshold=5,
-            workers=50,
+            session_string=Config.TG_USER_SESSION,
+            sleep_threshold=50,
+            workers=8,
             plugins={"root": "plugins"}
         )
 
-    async def start(self):
-        await super().start()
+    async def start(self, *args, **kwargs):
+        await super().start(*args, **kwargs)
         me = await self.get_me()
         logging.info(f"@{me.username} Is Started!")
 
-    async def stop(self, *args):
-        await super().stop()
+    async def stop(self, *args, **kwargs):
+        await super().stop(*args, **kwargs)
         logging.info("Bot stopped. Bye.")
     
     async def iter_messages(self, chat_id: Union[int, str], limit: int, offset: int = 0) -> Optional[AsyncGenerator["types.Message", None]]:
