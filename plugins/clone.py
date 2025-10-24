@@ -5,12 +5,16 @@ from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
+from PTT import parse_title
+
 logger = logging.getLogger(__name__)
 
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
 FORWARDING = {}
+COPY_MOVIES_ONLY = {} 
+COPY_SERIES_ONLY = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -110,18 +114,63 @@ async def set_target_channel(bot, message):
     CHANNEL[message.from_user.id] = int(chat.id)
     await message.reply(f"Successfully set {chat.title} target channel.")
 
+@Client.on_message(filters.private & filters.command(['copy_movies_only']))
+async def copy_movies_only(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply("Usage: /copy_movies_only on or /copy_movies_only off")
+    if COPY_SERIES_ONLY.get(user_id):
+        COPY_SERIES_ONLY[user_id] = False
 
+    COPY_MOVIES_ONLY[user_id] = (parts[1].lower() == "on")
+
+    await message.reply(
+        f"✅ Copy movies only is now <b>{'ENABLED' if COPY_MOVIES_ONLY[user_id] else 'DISABLED'}</b>"
+    )
+    
+@Client.on_message(filters.private & filters.command(['copy_movies_only']))
+async def copy_movies_only(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply("Usage: /copy_movies_only on or /copy_movies_only off")
+    if COPY_SERIES_ONLY.get(user_id):
+        COPY_SERIES_ONLY[user_id] = False
+
+    COPY_MOVIES_ONLY[user_id] = (parts[1].lower() == "on")
+
+    await message.reply(
+        "✅ <b>{'ENABLED' if COPY_MOVIES_ONLY[user_id] else 'DISABLED'}</b>"
+    )
+    
+@Client.on_message(filters.private & filters.command(['forwardall']))
+async def forward_all(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return await message.reply("You Are Not Allowed To Use This UserBot")
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply("Usage: /forwardall on or /forwardall off")
+    COPY_MOVIES_ONLY[user_id] = False
+    COPY_SERIES_ONLY[user_id] = False
+    await message.reply("Now userbot will forward all type video's and documents") 
+    
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
     forwarded = 0
     deleted = 0
     unsupported = 0
     fetched = 0
-    duplicate = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
+    copy_movies = COPY_MOVIES_ONLY.get(user_id)
+    copy_series = COPY_SERIES_ONLY.get(user_id)
     # lst_msg_id is same to total messages
-
     try:
         async for message in bot.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
             if CANCEL.get(user_id):
@@ -129,42 +178,39 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 FORWARDING[user_id] = False 
                 break
             if forwarded == 500:
-                await msg.edit(f"Forward stopped! You Reached Max Limit\n<b>Message ID</b>: <code>{message.id}</code>\n<b>Forwarded</b>: <code>{forwarded}</code>\nDuplicate: <code>{duplicate}</code>")
+                await msg.edit(f"Forward stopped! You Reached Max Limit\n<b>Message ID</b>: <code>{message.id}</code>\n<b>Forwarded</b>: <code>{forwarded}</code>")
                 FORWARDING[user_id] = False 
                 break
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>\n\n send "<code>cancel</code>" for stop''')
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
             if message.empty:
                 deleted += 1
                 continue
             if not message.media:
+                unsupported += 1
                 continue
             if message.media not in [MessageMediaType.DOCUMENT, MessageMediaType.VIDEO]:
                 continue
-            btn = []
-            if message.media == MessageMediaType.VIDEO:
-                media_type = MessagesFilter.VIDEO
-                file_n = 'video'
-            else:
-                media_type = MessagesFilter.DOCUMENT  
-                file_n = 'document'
             if message.caption:
-                search_text = message.caption
+                title = message.caption
             else:
-                search_text = message.video.file_name if message.video.file_name else message.document.file_name
-            file_name = False    
-            async for msg_s in bot.search_messages(-1002022867287,query=search_text,filter=media_type):       
-                if msg_s.caption:
-                    file_name = True
-                elif file_n == 'video':
-                    file_name = msg_s.video.file_name
-                else:
-                    file_name = msg_s.document.file_name    
-            if file_name:
-                duplicate += 1
-                continue             
+                title = message.video.file_name if message.video.file_name else message.document.file_name
+            if copy_movies:
+                data = parse_title(title, translate_languages=True)
+                seasons = data.get("seasons", [])
+                episodes = data.get("episodes", [])
+                if seasons or episodes:
+                    unsupported +=1
+                    continue
+            if copy_series:
+                data = parse_title(title, translate_languages=True)
+                seasons = data.get("seasons", [])
+                episodes = data.get("episodes", [])
+                if not seasons and not episodes:
+                    unsupported += 1
+                    continue
             try:         
                 media = getattr(message, message.media.value, None)
                 if media:
@@ -209,5 +255,5 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
         FORWARDING[user_id] = False
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
