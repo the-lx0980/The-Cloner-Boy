@@ -10,7 +10,7 @@ async def extract_caption(title: str) -> str:
         return title
 
     try:
-        data = parse_title(title, translate_languages=False)
+        data = parse_title(title)
         name = data.get("title", "")
         year = data.get("year")
         seasons = data.get("seasons", [])
@@ -83,7 +83,7 @@ async def extract_caption(title: str) -> str:
                 ep_part = (f"E{episodes[0]:02d}" if len(episodes) == 1
                            else f"E{episodes[0]:02d} – E{episodes[-1]:02d}")
             else:
-                ep_part = "Complete_"             
+                ep_part = "Complete"             
             formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {components_clean}"
         else:
             formatted = f"{name} {year_str} {components_clean}"
