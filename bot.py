@@ -29,13 +29,13 @@ class Bot(Client):
             plugins={"root": "plugins"}
         )
 
-    async def start(self):
-        await super().start()
+    async def start(self, *args, **kwargs):
+        await super().start(*args, **kwargs)
         me = await self.get_me()
         logging.info(f"@{me.username} Is Started!")
 
-    async def stop(self, *args):
-        await super().stop()
+    async def stop(self, *args, **kwargs):
+        await super().stop(*args, **kwargs)
         logging.info("Bot stopped. Bye.")
     
     async def iter_messages(self, chat_id: Union[int, str], limit: int, offset: int = 0) -> Optional[AsyncGenerator["types.Message", None]]:
@@ -75,4 +75,3 @@ class Bot(Client):
 
 app = Bot()
 app.run()
-

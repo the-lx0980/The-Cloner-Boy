@@ -3,15 +3,17 @@ import re
 import logging
 from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
-from pyrogram.errors import FloodWait
 from config import Config
+from utils.utils import forwards_messages
 
 logger = logging.getLogger(__name__)
 
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
+DELAY = {}
 FORWARDING = {}
+AI_CAPTION = {}
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
@@ -90,7 +92,28 @@ async def set_skip_number(bot, message):
     CURRENT[message.from_user.id] = int(skip)
     await message.reply(f"Successfully set <code>{skip}</code> skip number.")
 
-
+@Client.on_message(filters.private & filters.command(['set_delay'])) 
+async def set_delay_number(bot, message):
+    try:
+        _, delay = message.text.split(" ")
+    except:
+        return await message.reply("Give me a delay in seconds.")
+    try:
+        delay = int(delay)
+    except:
+        return await message.reply("Only support in numbers.")
+    DELAY[message.from_user.id] = int(delay)
+    await message.reply(f"Successfully set <code>{delay}</code> delay in second.")
+    
+@Client.on_message(filters.private & filters.command(['ai_caption']))
+async def toggle_ai_caption(bot, message):
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply("Usage: /ai_caption on or /ai_caption off")
+    AI_CAPTION[user_id] = (parts[1].lower() == "on")
+    await message.reply(f"✅ AI Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
+    
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
@@ -114,12 +137,16 @@ async def set_target_channel(bot, message):
 
 async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+    delay = DELAY.get(user_id) if DELAY.get(user_id) else 1
     forwarded = 0
     deleted = 0
     unsupported = 0
     fetched = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
+    from_chat = chat
+    to_chat = CHANNEL.get(user_id)
+    ai_caption = AI_CAPTION.get(user_id, False)
     # lst_msg_id is same to total messages
 
     try:
@@ -135,52 +162,12 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                if message.media:
-                    if message.media not in [
-                        MessageMediaType.PHOTO,
-                        MessageMediaType.DOCUMENT,
-                        MessageMediaType.AUDIO,
-                        MessageMediaType.STICKER,
-                        MessageMediaType.VIDEO]:
-                        continue 
-                    media = getattr(message, message.media.value, None)
-                    if media:
-                        try:
-                            await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
-                                file_id=media.file_id,
-                                caption=message.caption
-                            )
-                        except FloodWait as e:
-                            await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
-                            await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
-                                file_id=media.file_id,
-                                caption=message.caption
-                            )
-                else:
-                    try:
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption=message.caption,
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
-                        )
-                    except FloodWait as e:
-                        await asyncio.sleep(e.value)
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption=message.caption,
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
-                        )
+                await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
             except Exception as e:
                 logger.exception(e)
-                return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
+                return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
             forwarded += 1
-            await asyncio.sleep(1)            
+            await asyncio.sleep(delay)            
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")

@@ -10,16 +10,23 @@ import os
 async def start(_, m):
     if a.ADMINS and not ((str(m.from_user.id) in a.ADMINS) or (m.from_user.username in a.ADMINS)):
         return 
-    text = """I can forward document and video (mp4 and mkv) files.
+    text = f"""
+👋 Hello {m.from_user.first_name}!
 
-Forward your source channel message to this bot. If source channel is forward restricted last message link send to this bot.
+I can forward **documents** and **videos** (mp4/mkv) from a source channel to your target channel.
 
-/set_skip - Set skip message.
-/set_channel - Set target channel.
+**Commands:**
+/set_skip <number> - Skip first messages.
+/set_channel <channel_id> - Set target channel.
+/set_delay <seconds> - Set delay between forwards.
+/ai_caption on/off - Enable/disable AI caption formatting.
+/stop - restart the bot.
+/id - get users id and chat id. 
 
-Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
-    await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")
-
+⚠️ Note: Your settings are temporary. If the bot restarts, forwarding stops and settings are lost.
+"""
+    await m.reply(text)
+    
 @Client.on_message(filters.command("stop"))
 async def stop_button(bot, m):
     if a.ADMINS and not ((str(m.from_user.id) in a.ADMINS) or (m.from_user.username in a.ADMINS)):
