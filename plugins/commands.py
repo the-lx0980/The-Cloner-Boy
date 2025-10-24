@@ -17,6 +17,10 @@ Forward your source channel message to this bot. If source channel is forward re
 /set_skip - Set skip message.
 /set_channel - Set target channel.
 
+/copy_series_only - on/off- Forward only series. 
+/copy_movies_only - on/off - Forward only movies.
+/forwardall - on/off Forward all video's or documents
+
 Note - This bot not have a database, Then your details not saving permanently. If bot restarted your forward is stopping and your details is deleting."""
     await m.reply(f"👋 Hello {m.from_user.mention},\n\n{text}")
 
