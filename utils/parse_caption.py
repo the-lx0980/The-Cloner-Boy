@@ -10,7 +10,7 @@ async def extract_caption(title: str) -> str:
         return title
 
     try:
-        data = data = parse_title(title, translate_languages=True)
+        data = parse_title(title, translate_languages=True)
         name = data.get("title", "")
         year = data.get("year")
         seasons = data.get("seasons", [])
