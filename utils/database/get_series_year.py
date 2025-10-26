@@ -9,9 +9,7 @@ from utils.tmdb_utils import tmdbapi
 logger = logging.getLogger("AIYearFetcher")
 
 TMDB_API_KEY = random.choice(tmdbapi)
-# ───────────────────────────────
-# TMDb robust fetch function
-# ───────────────────────────────
+
 async def get_season_release_year_robust(series_name: str, season_number: int, api_key: str, retries: int = 3) -> int | None:
     tmdb = TMDb()
     tmdb.api_key = api_key
@@ -55,27 +53,20 @@ async def get_season_release_year_robust(series_name: str, season_number: int, a
     logger.error(f"❌ No valid data found for '{series_name}' Season {season_number}")
     return None
 
-
-# ───────────────────────────────
-# DB + TMDb Wrapper
-# ───────────────────────────────
 async def get_or_fetch_series_year(title: str, season: int) -> int | None:
     """
     1️⃣ Check MongoDB first.
     2️⃣ If missing, fetch from TMDb robust function.
     3️⃣ Save automatically in DB.
     """
-    # 1️⃣ Check DB
     year = get_series_year(title, int(season))
     if year:
         logger.info(f"📦 Found in DB: {title} S{season} → {year}")
         return year
-
-    # 2️⃣ Fetch from TMDb
+        
     logger.info(f"🔍 Year missing for {title} S{season}, fetching from TMDb...")
     year = await get_season_release_year_robust(title, season, TMDB_API_KEY)
     
-    # 3️⃣ Save if valid
     if isinstance(year, int):
         save_series_year(title, season, year)
         logger.info(f"💾 Saved to DB: {title} S{season} → {year}")
