@@ -142,7 +142,7 @@ async def copy_series_only(bot, message):
     if COPY_SERIES_ONLY.get(user_id):
         COPY_SERIES_ONLY[user_id] = False
 
-    COPY_MOVIES_ONLY[user_id] = (parts[1].lower() == "on")
+    COPY_SERIES_ONLY[user_id] = (parts[1].lower() == "on")
 
     await message.reply(
         "✅ <b>{'ENABLED' if COPY_MOVIES_ONLY[user_id] else 'DISABLED'}</b>"
