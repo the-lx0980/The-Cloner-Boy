@@ -5,17 +5,11 @@ from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from dotenv import load_dotenv
 
-# -------------------------------
-# 🧠 Load Environment & Logging
-# -------------------------------
-load_dotenv()  # Load environment variables at the start
+load_dotenv()  
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# -------------------------------
-# ⚙️ MongoDB Connection
-# -------------------------------
 def connect_to_mongodb() -> Optional[Collection]:
     """Connect to MongoDB and return the media_info collection."""
     mongo_uri = os.getenv("MONGODB_URI")
@@ -36,9 +30,6 @@ def connect_to_mongodb() -> Optional[Collection]:
 
 collection = connect_to_mongodb()
 
-# -------------------------------
-# 🔒 Unique Index Creation
-# -------------------------------
 def create_unique_index(col: Collection) -> None:
     """Create a unique index on title, season, and type."""
     try:
@@ -53,9 +44,6 @@ def create_unique_index(col: Collection) -> None:
 if collection is None:
     create_unique_index(collection)
 
-# -------------------------------
-# 🔧 Helper Functions
-# -------------------------------
 def normalize_title(title: str) -> str:
     """Normalize title: lowercase, strip, collapse inner spaces."""
     if not title or not title.strip():
@@ -70,9 +58,6 @@ def validate_season(season: int) -> None:
     if not isinstance(season, int) or season < 1:
         raise ValueError(f"Invalid season: {season}. Must be positive.")
 
-# -------------------------------
-# 🛡️ Decorator: Requires MongoDB
-# -------------------------------
 def requires_connection(func):
     def wrapper(*args, **kwargs):
         if collection is None:
@@ -83,9 +68,6 @@ def requires_connection(func):
         return func(*args, **kwargs)
     return wrapper
 
-# -------------------------------
-# 🎬 Movie Functions
-# -------------------------------
 @requires_connection
 def get_movie_year(title: str) -> Optional[int]:
     title = normalize_title(title)
@@ -104,9 +86,6 @@ def save_movie_year(title: str, year: int) -> bool:
     logger.info(f"✅ Saved Movie: {title.title()} → {year}")
     return True
 
-# -------------------------------
-# 📺 Series Functions
-# -------------------------------
 @requires_connection
 def get_series_year(title: str, season: int) -> Optional[int]:
     title = normalize_title(title)
@@ -127,9 +106,6 @@ def save_series_year(title: str, season: int, year: int) -> bool:
     logger.info(f"✅ Saved Series: {title.title()} S{season} → {year}")
     return True
 
-# -------------------------------
-# 🌸 Anime Functions
-# -------------------------------
 @requires_connection
 def get_anime_year(title: str, season: int) -> Optional[int]:
     title = normalize_title(title)
@@ -179,9 +155,6 @@ def delete_anime(title: str, season: Optional[int] = None) -> int:
         logger.warning(f"⚠️ No record found for {title.title()} (S{season if season else 'All'})")
     return count
 
-# -------------------------------
-# 🧾 List / Delete All Media
-# -------------------------------
 @requires_connection
 def list_all_media(skip: int = 0, limit: int = 100) -> List[Dict]:
     return list(collection.find({}, {"_id": 0}).skip(skip).limit(limit))
