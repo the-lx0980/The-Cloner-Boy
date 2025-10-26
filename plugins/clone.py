@@ -131,8 +131,8 @@ async def copy_movies_only(bot, message):
         f"✅ Copy movies only is now <b>{'ENABLED' if COPY_MOVIES_ONLY[user_id] else 'DISABLED'}</b>"
     )
     
-@Client.on_message(filters.private & filters.command(['copy_movies_only']))
-async def copy_movies_only(bot, message):
+@Client.on_message(filters.private & filters.command(['copy_series_only']))
+async def copy_series_only(bot, message):
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
         return await message.reply("You Are Not Allowed To Use This UserBot")
     user_id = message.from_user.id
