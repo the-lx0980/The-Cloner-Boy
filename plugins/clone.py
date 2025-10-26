@@ -139,8 +139,8 @@ async def copy_series_only(bot, message):
     parts = message.text.split(" ")
     if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
         return await message.reply("Usage: /copy_movies_only on or /copy_movies_only off")
-    if COPY_SERIES_ONLY.get(user_id):
-        COPY_SERIES_ONLY[user_id] = False
+    if COPY_MOVIES_ONLY.get(user_id):
+        COPY_MOVIES_ONLY[user_id] = False
 
     COPY_SERIES_ONLY[user_id] = (parts[1].lower() == "on")
 
