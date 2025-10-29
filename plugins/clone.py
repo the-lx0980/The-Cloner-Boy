@@ -166,6 +166,8 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
+                FORWARDING[user_id] = False
+                break
             forwarded += 1
             await asyncio.sleep(delay)            
     except Exception as e:
