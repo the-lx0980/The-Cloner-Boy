@@ -114,7 +114,7 @@ async def set_target_channel(bot, message):
 @Client.on_message(filters.chat(-1003194225143))
 async def auto_get_link(bot, message):
     chat_id_regex = re.compile(r"-100\d{7,}")
-    matches = re.findall(chat_id_regex, message.text)
+    matches = re.findall(chat_id_regex, str(message.text))
     if not matches:
         return 
     link = None
