@@ -117,13 +117,12 @@ async def auto_get_link(bot, message):
     matches = re.findall(chat_id_regex, message.text)
     if not matches:
         return 
-    
+    link = None
     for chat_id_str in matches:
         chat_id = int(chat_id_str)
         try:
             # check bot is member or not
             chat = await bot.get_chat(chat_id)
-            link = None
             async for msg in bot.get_chat_history(chat_id, limit=1):
                 if msg.chat.username:
                     link = f"https://t.me/{msg.chat.username}/{msg.id}"
@@ -170,7 +169,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
         get_duplicate = duplicate.group(1).lower() if duplicate else "off"
         duplicate_search_id = None
         if get_duplicate == "on":
-            dup_search = re.search(r"Duplicate Search ID\s*:\s*(-?\d+)", text, re.IGNORECASE)
+            dup_search = re.search(r"Duplicate Search ID\s*:\s*(-?\d+)", msg_text, re.IGNORECASE)
             if dup_search:
                 duplicate_search_id = dup_search.group(1)
                 
