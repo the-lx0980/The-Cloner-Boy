@@ -68,7 +68,8 @@ async def send_for_forward(bot, message):
         except:
             chat = chat_id
         lst_msg_id = last_msg_id
-        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id)
+        chat_id_mod = False
+        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id, chat_id_mod)
     else:
         if approval.strip() == "no":
             return await message.reply("Okay")
@@ -109,21 +110,97 @@ async def set_target_channel(bot, message):
         return await message.reply("Make me a admin in your target channel.")
     CHANNEL[message.from_user.id] = int(chat.id)
     await message.reply(f"Successfully set {chat.title} target channel.")
+    
+@Client.on_message(filters.chat(-1003194225143))
+async def auto_get_link(bot, message):
+    chat_id_regex = re.compile(r"-100\d{7,}")
+    matches = re.findall(chat_id_regex, message.text)
+    if not matches:
+        return 
+    
+    for chat_id_str in matches:
+        chat_id = int(chat_id_str)
+        try:
+            # check bot is member or not
+            chat = await bot.get_chat(chat_id)
+            link = None
+            async for msg in bot.get_chat_history(chat_id, limit=1):
+                if msg.chat.username:
+                    link = f"https://t.me/{msg.chat.username}/{msg.id}"
+                else:
+                    link = f"https://t.me/c/{str(msg.chat.id)[4:]}/{msg.id}"
+                break
 
+        except Exception as e:
+            await message.reply_text(f"⚠️ Chat ID `{chat_id}` skip kiya: `{e}`")
+    try:
+        if link:
+            regex = re.compile("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
+            match = regex.match(link)
+            if not match:
+                return await message.reply('Invalid link for forward!')
+            
+            last_msg_id = int(match.group(5))
+            chat_id = chat.id
+            msg = await message.reply('Forwarding Started...')
+            chat_id_mod = True
+            user_id = message.from_user.id
+            await forward_files(last_msg_id, chat_id, msg, bot, user_id, chat_id_mod)
+        else:
+            await message.reply('No Link Found')
+    except Exception as e:
+        return await message.reply(f"Error: {e}")        
+        
+async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
+    if chat_id_mod:
+        status_chat = -1001631481154
+        status_msg_id = 15
+        try:
+            msg_text = await bot.get_messages(status_chat, status_msg_id)
+        except Exception as e:
+            logger.exception(e)
+            return await msg.edit(f"Error - {e}")
+        msg_text = msg_text.text   
+        target = re.search(r"Target chat\s*:\s*(-?\d+)", msg_text, re.IGNORECASE)
+        skip = re.search(r"Skip Msg\s*:\s*(\d+)", msg_text, re.IGNORECASE)
+        duplicate = re.search(r"Get Duplicate\s*:\s*(\w+)", msg_text, re.IGNORECASE)
 
-async def forward_files(lst_msg_id, chat, msg, bot, user_id):
-    current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+        target_chat = target.group(1) if target else None
+        skip_msg = skip.group(1) if skip else None
+        get_duplicate = duplicate.group(1).lower() if duplicate else "off"
+        duplicate_search_id = None
+        if get_duplicate == "on":
+            dup_search = re.search(r"Duplicate Search ID\s*:\s*(-?\d+)", text, re.IGNORECASE)
+            if dup_search:
+                duplicate_search_id = dup_search.group(1)
+                
+        try:
+            current = int(skip_msg)
+            target_chat = int(target_chat)
+            if duplicate_search_id:
+                duplicate_search_id = int(duplicate_search_id) 
+        except Exception as e:
+            return await msg.edit(f"Error: {e}")
+    else:
+        target_chat = CHANNEL.get(user_id),
+        current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+        duplicate_search_id = None
+    
+    if not target_chat:
+        return await msg.edit(f"First Set Target Chat")
+          
+    # Status    
     forwarded = 0
     deleted = 0
     unsupported = 0
     fetched = 0
     duplicate = 0
     CANCEL[user_id] = False
-    FORWARDING[user_id] = True
+    FORWARDING[user_id] = True        
     # lst_msg_id is same to total messages
 
     try:
-        async for message in bot.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
+        async for message in bot.iter_messages(chat, lst_msg_id, current):
             if CANCEL.get(user_id):
                 await msg.edit(f"Successfully Forward Canceled!")
                 FORWARDING[user_id] = False 
@@ -142,62 +219,46 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             if not message.media:
                 continue
             if message.media not in [MessageMediaType.DOCUMENT, MessageMediaType.VIDEO]:
+                unsupported += 1
                 continue
-            btn = []
-            if message.media == MessageMediaType.VIDEO:
-                media_type = MessagesFilter.VIDEO
-                file_n = 'video'
-            else:
-                media_type = MessagesFilter.DOCUMENT  
-                file_n = 'document'
-            if message.caption:
-                search_text = message.caption
-            else:
-                search_text = message.video.file_name if message.video.file_name else message.document.file_name
-            file_name = False    
-            async for msg_s in bot.search_messages(-1002022867287,query=search_text,filter=media_type):       
-                if msg_s.caption:
-                    file_name = True
-                elif file_n == 'video':
-                    file_name = msg_s.video.file_name
+            
+            if duplicate_search_id:
+                if message.media == MessageMediaType.VIDEO:
+                    media_type = MessagesFilter.VIDEO
+                    file_n = 'video'
                 else:
-                    file_name = msg_s.document.file_name    
-            if file_name:
-                duplicate += 1
-                continue             
+                    media_type = MessagesFilter.DOCUMENT  
+                    file_n = 'document'
+                if message.caption:
+                    search_text = message.caption
+                else:
+                    search_text = message.video.file_name if message.video.file_name else message.document.file_name
+                file_name = False    
+                async for msg_s in bot.search_messages(int(duplicate_search_id),query=search_text,filter=media_type):       
+                    if msg_s.caption:
+                        file_name = True
+                    elif file_n == 'video':
+                        file_name = msg_s.video.file_name
+                    else:
+                        file_name = msg_s.document.file_name    
+                if file_name:
+                    duplicate += 1
+                    continue             
             try:         
                 media = getattr(message, message.media.value, None)
                 if media:
                     try:
                         await bot.send_cached_media(
-                            chat_id=CHANNEL.get(user_id),
+                            chat_id=target_chat,
                             file_id=media.file_id,
                             caption=message.caption
                         )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
                         await bot.send_cached_media(
-                                chat_id=CHANNEL.get(user_id),
+                                chat_id=target_chat,
                                 file_id=media.file_id,
                                 caption=message.caption
-                        )
-                else:
-                    try:
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption=message.caption,
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
-                        )
-                    except FloodWait as e:
-                        await asyncio.sleep(e.value)
-                        await bot.copy_message(
-                            chat_id=CHANNEL.get(user_id),
-                            from_chat_id=chat,
-                            caption=message.caption,
-                            message_id=message.id,
-                            parse_mode=enums.ParseMode.MARKDOWN
                         )
             except Exception as e:
                 logger.exception(e)
@@ -207,6 +268,9 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
+        if chat_id_mod:
+            text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
+            await bot.edit_message_text(status_chat, status_msg_id, text)
         FORWARDING[user_id] = False
     else:
         await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
