@@ -267,6 +267,9 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
+        if chat_id_mod:
+            text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
+            await bot.edit_message_text(status_chat, status_msg_id, text)
         FORWARDING[user_id] = False
     else:
         await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
