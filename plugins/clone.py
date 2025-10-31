@@ -182,7 +182,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
         except Exception as e:
             return await msg.edit(f"Error: {e}")
     else:
-        target_chat = CHANNEL.get(user_id),
+        target_chat = CHANNEL.get(user_id)
         current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
         duplicate_search_id = None
     
