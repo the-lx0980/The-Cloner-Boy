@@ -171,6 +171,12 @@ async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
     if chat_id_mod:
         status_chat = Config.STATUS_CHANNEL_ID
         status_msg_id = Config.STATUS_CHANNEL_MSG_ID
+
+        try:
+            chat = await bot.get_chat(status_chat)
+        except:
+            return await msg.edit("Make sure userbot is admin in your status channel and status channel id is correct.")
+            
         try:
             msg_text = await bot.get_messages(status_chat, status_msg_id)
         except Exception as e:
