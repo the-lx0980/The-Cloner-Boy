@@ -3,7 +3,7 @@ import re
 import logging
 from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram import Client, filters, enums
-from pyrogram.errors import FloodWait
+from pyrogram.errors import FloodWait, MessageNotModified
 from config import Config
 from helper.helper import get_latest_media_link
 
@@ -169,7 +169,7 @@ async def auto_get_link(bot, message):
     except Exception as e:
         return await message.reply(f"Error: {e}")        
         
-async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
+async def forward_files(lst_msg_id, from_chat, msg, bot, track_chat_id, chat_id_mod):
     if chat_id_mod:
         status_chat = Config.STATUS_CHANNEL_ID
         status_msg_id = Config.STATUS_CHANNEL_MSG_ID
@@ -224,7 +224,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
     # lst_msg_id is same to total messages
 
     try:
-        async for message in bot.iter_messages(chat, lst_msg_id, current):
+        async for message in bot.iter_messages(from_chat, lst_msg_id, current):
             if CANCEL.get(track_chat_id):
                 await msg.edit(f"Successfully Forward Canceled!")
                 FORWARDING[track_chat_id] = False 
@@ -287,7 +287,15 @@ async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
                         )
             except Exception as e:
                 logger.exception(e)
-                return await msg.reply(f"Forward Canceled!\n\nError - {e}")               
+                await msg.reply(f"Forward Canceled!\n\nError - {e}")
+                FORWARDING[track_chat_id] = False
+                if chat_id_mod:
+                    text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
+                    try:
+                        await bot.edit_message_text(status_chat, status_msg_id, text)
+                    except MessageNotModified:
+                        pass
+                break          
             forwarded += 1
             await asyncio.sleep(4)            
     except Exception as e:
@@ -295,12 +303,18 @@ async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
         if chat_id_mod:
             text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
-            await bot.edit_message_text(status_chat, status_msg_id, text)
+            try:
+                await bot.edit_message_text(status_chat, status_msg_id, text)
+            except MessageNotModified:
+                pass
         FORWARDING[track_chat_id] = False
     else:
         await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
         if chat_id_mod:
             text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
-            await bot.edit_message_text(status_chat, status_msg_id, text)
+            try:
+                await bot.edit_message_text(status_chat, status_msg_id, text)
+            except MessageNotModified:
+                pass
         FORWARDING[track_chat_id] = False
         
