@@ -216,6 +216,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
                 deleted += 1
                 continue
             if not message.media:
+                unsupported += 1
                 continue
             if message.media not in [MessageMediaType.DOCUMENT, MessageMediaType.VIDEO]:
                 unsupported += 1
