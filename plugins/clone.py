@@ -225,7 +225,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
 
     try:
         async for message in bot.iter_messages(chat, lst_msg_id, current):
-            if CANCEL.get(user_id):
+            if CANCEL.get(track_chat_id):
                 await msg.edit(f"Successfully Forward Canceled!")
                 FORWARDING[track_chat_id] = False 
                 break
