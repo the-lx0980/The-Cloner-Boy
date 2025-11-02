@@ -142,7 +142,7 @@ async def auto_get_link(bot, message):
         chat_id = int(chat_id_str)
         try:
             chat = await bot.get_chat(chat_id)
-            link = await get_latest_media_link(bot, chat_id)
+            link = await get_latest_media_link(bot, chat.id, message)
             if not link:
                 await message.reply_text(f"⚠️ No video/document found in `{chat_id}`.")
                 continue
