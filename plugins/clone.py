@@ -5,24 +5,40 @@ from pyrogram.enums import MessageMediaType, MessagesFilter
 from pyrogram import Client, filters, enums
 from pyrogram.errors import FloodWait
 from config import Config
+from helper.helper import get_latest_media_link
+
 logger = logging.getLogger(__name__)
 
 CURRENT = {}
 CHANNEL = {}
 CANCEL = {}
 FORWARDING = {}
+STATUS_CHAT = Config.STATUS_CHAT_GROUP_ID
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
+    if message.chat.type == enums.ChatType.GROUP:
+        track_chat_id = message.chat.id
+        if track_chat_id != STATUS_CHAT:
+            return    
+    else:
+        track_chat_id = message.from_user.id
     cancel = await message.reply("Trying to cancel forwarding...")
-    if FORWARDING.get(message.from_user.id):
-        CANCEL[message.from_user.id] = True
+    if FORWARDING.get(track_chat_id):
+        CANCEL[track_chat_id] = True
         await cancel.edit("Successfully Forward Canceled!")
     else:
         await cancel.edit("No Forward Countinue Currently!")
 
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
+    if message.chat.type == enums.ChatType.GROUP:
+        track_chat_id = message.chat.id
+        if track_chat_id != STATUS_CHAT:
+            return
+    else:
+        track_chat_id = message.from_user.id       
+            
     if message.text:
         regex = re.compile("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
         match = regex.match(message.text)
@@ -60,7 +76,7 @@ async def send_for_forward(bot, message):
     )
     approval = approval.text.lower()  
     if approval.strip() == "yes":
-        if FORWARDING.get(message.from_user.id):
+        if FORWARDING.get(track_chat_id):
             return await message.reply('Wait until previous process complete.')
         msg = await message.reply('Starting Forwarding...')
         try:
@@ -69,7 +85,7 @@ async def send_for_forward(bot, message):
             chat = chat_id
         lst_msg_id = last_msg_id
         chat_id_mod = False
-        await forward_files(int(lst_msg_id), chat, msg, bot, message.from_user.id, chat_id_mod)
+        await forward_files(int(lst_msg_id), chat, msg, bot, track_chat_id, chat_id_mod)
     else:
         if approval.strip() == "no":
             return await message.reply("Okay")
@@ -111,27 +127,28 @@ async def set_target_channel(bot, message):
     CHANNEL[message.from_user.id] = int(chat.id)
     await message.reply(f"Successfully set {chat.title} target channel.")
     
-@Client.on_message(filters.chat(-1003194225143))
+@Client.on_message(filters.chat(STATUS_CHAT))
 async def auto_get_link(bot, message):
     chat_id_regex = re.compile(r"-100\d{7,}")
     matches = re.findall(chat_id_regex, str(message.text))
     if not matches:
         return 
+        
+    if FORWARDING.get(STATUS_CHAT):
+        return await message.reply('Wait until previous process complete.')
+         
     link = None
     for chat_id_str in matches:
         chat_id = int(chat_id_str)
         try:
-            # check bot is member or not
             chat = await bot.get_chat(chat_id)
-            async for msg in bot.get_chat_history(chat_id, limit=1):
-                if msg.chat.username:
-                    link = f"https://t.me/{msg.chat.username}/{msg.id}"
-                else:
-                    link = f"https://t.me/c/{str(msg.chat.id)[4:]}/{msg.id}"
-                break
-
+            link = await get_latest_media_link(bot, chat_id)
+            if not link:
+                await message.reply_text(f"⚠️ No video/document found in `{chat_id}`.")
+                continue
         except Exception as e:
             await message.reply_text(f"⚠️ Chat ID `{chat_id}` skip kiya: `{e}`")
+            
     try:
         if link:
             regex = re.compile("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")
@@ -143,17 +160,17 @@ async def auto_get_link(bot, message):
             chat_id = chat.id
             msg = await message.reply('Forwarding Started...')
             chat_id_mod = True
-            user_id = message.from_user.id
-            await forward_files(last_msg_id, chat_id, msg, bot, user_id, chat_id_mod)
+            track_chat_id = STATUS_CHAT
+            await forward_files(last_msg_id, chat_id, msg, bot, track_chat_id, chat_id_mod)
         else:
             await message.reply('No Link Found')
     except Exception as e:
         return await message.reply(f"Error: {e}")        
         
-async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
+async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
     if chat_id_mod:
-        status_chat = -1001631481154
-        status_msg_id = 15
+        status_chat = -Config.STATUS_CHANNEL_ID
+        status_msg_id = Config.STATUS_CHANNEL_MSG_ID
         try:
             msg_text = await bot.get_messages(status_chat, status_msg_id)
         except Exception as e:
@@ -181,8 +198,8 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
         except Exception as e:
             return await msg.edit(f"Error: {e}")
     else:
-        target_chat = CHANNEL.get(user_id)
-        current = CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+        target_chat = CHANNEL.get(track_chat_id)
+        current = CURRENT.get(track_chat_id) if CURRENT.get(track_chat_id) else 0
         duplicate_search_id = None
     
     if not target_chat:
@@ -194,19 +211,19 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
     unsupported = 0
     fetched = 0
     duplicate = 0
-    CANCEL[user_id] = False
-    FORWARDING[user_id] = True        
+    CANCEL[track_chat_id] = False
+    FORWARDING[track_chat_id] = True        
     # lst_msg_id is same to total messages
 
     try:
         async for message in bot.iter_messages(chat, lst_msg_id, current):
             if CANCEL.get(user_id):
                 await msg.edit(f"Successfully Forward Canceled!")
-                FORWARDING[user_id] = False 
+                FORWARDING[track_chat_id] = False 
                 break
             if forwarded == 500:
                 await msg.edit(f"Forward stopped! You Reached Max Limit\n<b>Message ID</b>: <code>{message.id}</code>\n<b>Forwarded</b>: <code>{forwarded}</code>\nDuplicate: <code>{duplicate}</code>")
-                FORWARDING[user_id] = False 
+                FORWARDING[track_chat_id] = False 
                 break
             current += 1
             fetched += 1
@@ -271,10 +288,11 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id, chat_id_mod):
         if chat_id_mod:
             text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
             await bot.edit_message_text(status_chat, status_msg_id, text)
-        FORWARDING[user_id] = False
+        FORWARDING[track_chat_id] = False
     else:
         await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nDuplicate: <code>{duplicate}</code>')
         if chat_id_mod:
             text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
             await bot.edit_message_text(status_chat, status_msg_id, text)
-        FORWARDING[user_id] = False
+        FORWARDING[track_chat_id] = False
+        
