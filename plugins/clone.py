@@ -137,12 +137,12 @@ async def auto_get_link(bot, message):
     if FORWARDING.get(STATUS_CHAT):
         return await message.reply('Wait until previous process complete.')
         
-    chat_id = int(match.group(0))
+    chat_ids = int(match.group(0))
     
     link = None
     try:
         try:
-            chat = await bot.get_chat(chat_id)
+            chat = await bot.get_chat(chat_ids)
         except:
             return await message.reply(f"Make sure userbot is member of source chat {chat_id}.")
         link = await get_latest_media_link(bot, chat.id, message)
@@ -159,7 +159,7 @@ async def auto_get_link(bot, message):
                 return await message.reply('Invalid link for forward!')
             
             last_msg_id = int(match.group(5))
-            chat_id = chat.id
+            chat_id = chat_ids
             msg = await message.reply('Forwarding Started...')
             chat_id_mod = True
             track_chat_id = STATUS_CHAT
