@@ -11,8 +11,7 @@ async def get_latest_media_link(bot, chat_id: int, message):
         # Search messages (newest first)
         async for msg in bot.search_messages(
             chat_id,
-            filter=MessagesFilter.EMPTY,  # fetch all types
-            limit=100
+            filter=MessagesFilter.EMPTY
         ):
             if msg.video or msg.document:
                 # Build link manually (msg.link doesn't always exist)
@@ -25,7 +24,6 @@ async def get_latest_media_link(bot, chat_id: int, message):
                 await message.reply(f"✅ Latest media link found:\n\n{link}")
                 return link
 
-        # No media found
         logger.warning(f"⚠️ No video/document found in chat {chat_id}")
         await message.reply(f"⚠️ No video/document found in `{chat_id}`.")
         return None
