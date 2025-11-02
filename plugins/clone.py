@@ -17,7 +17,7 @@ STATUS_CHAT = Config.STATUS_CHAT_GROUP_ID
 
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
-    if message.chat.type == enums.ChatType.GROUP:
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         track_chat_id = message.chat.id
         if track_chat_id != STATUS_CHAT:
             return    
@@ -32,7 +32,7 @@ async def cancel_forward(bot, message):
 
 @Client.on_message((filters.forwarded | (filters.regex("(https://)?(t\.me/|telegram\.me/|telegram\.dog/)(c/)?(\d+|[a-zA-Z_0-9]+)/(\d+)$")) & filters.text) & filters.private & filters.incoming)
 async def send_for_forward(bot, message):
-    if message.chat.type == enums.ChatType.GROUP:
+    if message.chat.type in [enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
         track_chat_id = message.chat.id
         if track_chat_id != STATUS_CHAT:
             return
@@ -162,7 +162,7 @@ async def auto_get_link(bot, message):
             chat_id = chat_ids
             msg = await message.reply('Forwarding Started...')
             chat_id_mod = True
-            track_chat_id = STATUS_CHAT
+            track_chat_id = message.chat.id
             await forward_files(last_msg_id, chat_id, msg, bot, track_chat_id, chat_id_mod)
         else:
             await message.reply('No Link Found')
