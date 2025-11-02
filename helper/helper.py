@@ -38,6 +38,5 @@ async def get_latest_media_link(bot, chat_id: int, message):
 
     # No media found
     logger.warning(f"⚠️ No video/document found in chat_id: {chat_id}")
-    if reply_message:
-        await message.reply(f"⚠️ No video/document found in `{chat_id}`.")
+    await message.reply(f"⚠️ No video/document found in `{chat_id}`.")
     return None
