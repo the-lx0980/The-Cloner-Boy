@@ -212,6 +212,18 @@ async def forward_files(lst_msg_id, from_chat, msg, bot, track_chat_id, chat_id_
     
     if not target_chat:
         return await msg.edit(f"First Set Target Chat")
+        
+    try:
+        chat = await bot.get_chat(target_chat)
+    except:
+        return await msg.edit("Make sure userbot is admin in your in target channel and target chat id is correct.")   
+    
+    if duplicate_search_id:
+        try:
+            chat = await bot.get_chat(duplicate_search_id)
+        except:
+            return await msg.edit("Make sure userbot is mmember of duplicate search channel and chat id is correct.")   
+            
           
     # Status    
     forwarded = 0
@@ -289,12 +301,6 @@ async def forward_files(lst_msg_id, from_chat, msg, bot, track_chat_id, chat_id_
                 logger.exception(e)
                 await msg.reply(f"Forward Canceled!\n\nError - {e}")
                 FORWARDING[track_chat_id] = False
-                if chat_id_mod:
-                    text = f"Target chat: {target_chat}\nSkip Msg: {current}\nGet Duplicate: {get_duplicate}\nDuplicate Search ID: {duplicate_search_id or ''}"
-                    try:
-                        await bot.edit_message_text(status_chat, status_msg_id, text)
-                    except MessageNotModified:
-                        pass
                 break          
             forwarded += 1
             await asyncio.sleep(4)            
