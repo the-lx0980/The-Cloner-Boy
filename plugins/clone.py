@@ -169,10 +169,10 @@ async def auto_get_link(bot, message):
         
 async def forward_files(lst_msg_id, chat, msg, bot, track_chat_id, chat_id_mod):
     if chat_id_mod:
-        status_chat = -Config.STATUS_CHANNEL_ID
+        status_chat = Config.STATUS_CHANNEL_ID
         status_msg_id = Config.STATUS_CHANNEL_MSG_ID
         try:
-            msg_text = await bot.get_messages(int(status_chat), int(status_msg_id))
+            msg_text = await bot.get_messages(status_chat, status_msg_id)
         except Exception as e:
             logger.exception(e)
             return await msg.edit(f"Error - {e}")
