@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 async def get_latest_media_link(bot, chat_id: int, message):
     """Find and return the latest video/document link in a chat."""
     try:
+        link_msg = await message.reply(f"🔍 Searching latest media in chat {chat_id}")
         logger.info(f"🔍 Searching latest media in chat {chat_id}")
 
         # Search messages (newest first)
@@ -21,14 +22,14 @@ async def get_latest_media_link(bot, chat_id: int, message):
                     link = f"https://t.me/c/{str(msg.chat.id)[4:]}/{msg.id}"
 
                 logger.info(f"✅ Found latest media in {chat_id}: {link}")
-                await message.reply(f"✅ Latest media link found:\n\n{link}")
+                await link_msg.edit(f"✅ Latest media link found:\n\n{link}")
                 return link
 
         logger.warning(f"⚠️ No video/document found in chat {chat_id}")
-        await message.reply(f"⚠️ No video/document found in `{chat_id}`.")
+        await link_msg.edit(f"⚠️ No video/document found in `{chat_id}`.")
         return None
 
     except Exception as e:
         logger.exception(f"❌ Error fetching media from chat {chat_id}: {e}")
-        await message.reply(f"❌ Error while fetching media from `{chat_id}`:\n\n{e}")
+        await link_msg.edit(f"❌ Error while fetching media from `{chat_id}`:\n\n{e}")
         return None       
