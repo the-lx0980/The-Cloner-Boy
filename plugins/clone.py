@@ -137,17 +137,18 @@ async def auto_get_link(bot, message):
     if FORWARDING.get(STATUS_CHAT):
         return await message.reply('Wait until previous process complete.')
          
-    link = None
-    for chat_id_str in matches:
-        chat_id = int(chat_id_str)
+    link = None:
+    chat_id = int(chat_id_str)
+    try:
         try:
             chat = await bot.get_chat(chat_id)
-            link = await get_latest_media_link(bot, chat.id, message)
-            if not link:
-                await message.reply_text(f"⚠️ No video/document found in `{chat_id}`.")
-                continue
-        except Exception as e:
-            await message.reply_text(f"⚠️ Chat ID `{chat_id}` skip kiya: `{e}`")
+        except:
+            return await message.reply(f"Make sure userbot is member of source chat {chat_id}.")
+        link = await get_latest_media_link(bot, chat.id, message)
+        if not link:
+            return
+    except Exception as e:
+        return await message.reply_text(f"⚠️ Error `{e}`")
             
     try:
         if link:
