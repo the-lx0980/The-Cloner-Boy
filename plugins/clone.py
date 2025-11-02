@@ -130,15 +130,16 @@ async def set_target_channel(bot, message):
 @Client.on_message(filters.chat(STATUS_CHAT))
 async def auto_get_link(bot, message):
     chat_id_regex = re.compile(r"-100\d{7,}")
-    matches = re.findall(chat_id_regex, str(message.text))
-    if not matches:
+    match = chat_id_regex.search(str(message.text))
+    if not match:
         return 
-        
+    
     if FORWARDING.get(STATUS_CHAT):
         return await message.reply('Wait until previous process complete.')
-         
-    link = None:
-    chat_id = int(chat_id_str)
+        
+    chat_id = int(match.group(0))
+    
+    link = None
     try:
         try:
             chat = await bot.get_chat(chat_id)
