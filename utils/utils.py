@@ -8,7 +8,7 @@ logger = logging.getLogger("AIYearFetcher")
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     try:
-        if message.media:
+        if message.media and message.media in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO]:
             media_type = message.media.value
             media = getattr(message, media_type, None)
 
