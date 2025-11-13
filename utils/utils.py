@@ -1,4 +1,4 @@
-import logging            
+import logging
 import asyncio
 from pyrogram.errors import FloodWait
 from pyrogram import enums
@@ -8,17 +8,17 @@ logger = logging.getLogger("AIYearFetcher")
 
 async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
     try:
-        if message.media and message.media in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO]:
+        if message.media:
             media_type = message.media.value
             media = getattr(message, media_type, None)
 
-            if not hasattr(media, "file_id"):
+            if message.media and message.media not in [enums.MessageMediaType.DOCUMENT, enums.MessageMediaType.VIDEO]:
                 await bot.copy_message(
                     chat_id=to_chat,
                     from_chat_id=from_chat,
                     message_id=message.id
                 )
-                return
+                return "forwarded"
 
             caption = (
                 message.caption
@@ -39,6 +39,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 caption=f"**{caption or ''}**" if caption else None,
                 parse_mode=enums.ParseMode.MARKDOWN
             )
+            return "forwarded"
 
         else:
             await bot.copy_message(
@@ -46,10 +47,11 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 from_chat_id=from_chat,
                 message_id=message.id
             )
+            return "forwarded"
 
     except FloodWait as e:
         await asyncio.sleep(e.value)
-        await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
+        return await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
 
     except Exception as e:
         logger.info(f"[Forward Error Ignored] {e}")
@@ -59,5 +61,7 @@ async def forwards_messages(bot, message, from_chat, to_chat, ai_caption):
                 from_chat_id=from_chat,
                 message_id=message.id
             )
+            return "forwarded"
         except Exception as e2:
             logger.error(f"[Copy Retry Failed] {e2}")
+            return "error"
