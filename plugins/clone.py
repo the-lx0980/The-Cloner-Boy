@@ -146,6 +146,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     deleted = 0
     unsupported = 0
     fetched = 0
+    error = 0
     CANCEL[user_id] = False
     FORWARDING[user_id] = True
     from_chat = chat
@@ -161,22 +162,25 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
             current += 1
             fetched += 1
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
+                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nError: <code>{error}</code>\n\n send "<code>cancel</code>" for stop''')
             if message.empty:
                 deleted += 1
                 continue
             try:
-                await forwards_messages(bot, message, from_chat, to_chat, parse_caption)
+                status = await forwards_messages(bot, message, from_chat, to_chat, parse_caption)
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}")
                 FORWARDING[user_id] = False
                 break
-            forwarded += 1
+            if status == "forwarded":
+                forwarded += 1
+            elif status == "error":
+                error += 1
             await asyncio.sleep(delay)            
     except Exception as e:
         logger.exception(e)
         await msg.reply(f"Forward Canceled!\n\nError - {e}")
     else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
+        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\nError: <code>{error}</code>')
         FORWARDING[user_id] = False
