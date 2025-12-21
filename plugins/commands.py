@@ -100,46 +100,55 @@ async def join_chat(client: Client, message: Message):
 
     raw = message.command[1].strip()
 
+    if raw.startswith("https://t.me/"):
+        part = raw.replace("https://t.me/", "")
+    elif raw.startswith("t.me/"):
+        part = raw.replace("t.me/", "")
+    else:
+        part = raw
+
     try:
-        # Invite link
-        if raw.startswith("https://t.me/+") or "joinchat" in raw:
+        # INVITE LINK
+        if part.startswith("+") or "joinchat" in raw:
             chat = await client.join_chat(raw)
 
-        # Public username
+        # PUBLIC USERNAME
         else:
-            if not raw.startswith("@"):
-                raw = f"@{raw}"
-            chat = await client.join_chat(raw)
+            if not part.startswith("@"):
+                part = f"@{part}"
+            chat = await client.join_chat(part)
+
+        title = chat.title or "Private Chat"
 
         await message.reply(
             f"✅ **Joined Successfully**\n\n"
-            f"📌 **Chat:** `{chat.title}`\n"
+            f"📌 **Chat:** `{title}`\n"
             f"🆔 **ID:** `{chat.id}`"
         )
 
     except InviteRequestSent:
-        chat = await client.get_chat(raw)
+        chat = await client.get_chat(part)
         await message.reply(
             f"⏳ **Join Request Sent**\n"
             f"📌 **Chat:** `{chat.title}`"
         )
 
     except UserAlreadyParticipant:
-        chat = await client.get_chat(raw)
+        chat = await client.get_chat(part)
         await message.reply(
             f"⚠️ **Already Joined**\n"
             f"📌 **Chat:** `{chat.title}`"
         )
 
     except InviteHashExpired:
-        await message.reply("❌ Invite link expired or invalid")
+        await message.reply("❌ Invite link expired / invalid")
 
     except FloodWait as e:
         await asyncio.sleep(e.value)
-        await message.reply("⏳ FloodWait, try again later")
 
     except Exception as e:
         await message.reply(f"❌ **Error:** `{e}`")
+
 
 
 @Client.on_message(filters.command("leave") & filters.private)
