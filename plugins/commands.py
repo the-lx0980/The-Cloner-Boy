@@ -32,7 +32,7 @@ async def start(_, m: Message):
         "Forward your source channel message to this bot.\n\n"
         "/set_skip - Set skip message\n"
         "/set_channel - Set target channel\n"
-        "/id - Get User ID or Chat ID\n"
+        "/getid - Get User ID or Chat ID\n"
         "/stop - Restart bot\n"
         "/join - Join any chat (invite / public)\n"
         "/leave - Leave chat (chat_id)\n\n"
@@ -53,7 +53,7 @@ async def stop_button(bot: Client, m: Message):
     os.execl(sys.executable, sys.executable, *sys.argv)
 
 
-@Client.on_message(filters.command("id"))
+@Client.on_message(filters.command("getid"))
 async def show_id(_, message: Message):
 
     chat_type = message.chat.type
