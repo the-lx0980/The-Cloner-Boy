@@ -108,48 +108,51 @@ async def join_chat(client: Client, message: Message):
         part = raw
 
     try:
-        # INVITE LINK
+        # ---------- INVITE LINK ----------
         if part.startswith("+") or "joinchat" in raw:
             chat = await client.join_chat(raw)
 
-        # PUBLIC USERNAME
+            title = chat.title or "Private Chat"
+            await message.reply(
+                f"✅ **Joined Successfully**\n\n"
+                f"📌 **Chat:** `{title}`\n"
+                f"🆔 **ID:** `{chat.id}`"
+            )
+
+        # ---------- PUBLIC USERNAME ----------
         else:
             if not part.startswith("@"):
                 part = f"@{part}"
+
             chat = await client.join_chat(part)
 
-        title = chat.title or "Private Chat"
-
-        await message.reply(
-            f"✅ **Joined Successfully**\n\n"
-            f"📌 **Chat:** `{title}`\n"
-            f"🆔 **ID:** `{chat.id}`"
-        )
+            await message.reply(
+                f"✅ **Joined Successfully**\n\n"
+                f"📌 **Chat:** `{chat.title}`\n"
+                f"🆔 **ID:** `{chat.id}`"
+            )
 
     except InviteRequestSent:
-        chat = await client.get_chat(part)
         await message.reply(
-            f"⏳ **Join Request Sent**\n"
-            f"📌 **Chat:** `{chat.title}`"
+            "⏳ **Join Request Sent Successfully**\n\n"
+            "ℹ️ This is a request-only private chat.\n"
+            "Telegram does not allow fetching chat details\n"
+            "until the request is approved."
         )
 
     except UserAlreadyParticipant:
-        chat = await client.get_chat(part)
-        await message.reply(
-            f"⚠️ **Already Joined**\n"
-            f"📌 **Chat:** `{chat.title}`"
-        )
+        await message.reply("⚠️ **Already Joined This Chat**")
 
     except InviteHashExpired:
-        await message.reply("❌ Invite link expired / invalid")
+        await message.reply("❌ Invite link expired or invalid")
 
     except FloodWait as e:
         await asyncio.sleep(e.value)
+        await message.reply("⏳ FloodWait, try again later")
 
     except Exception as e:
         await message.reply(f"❌ **Error:** `{e}`")
-
-
+        
 
 @Client.on_message(filters.command("leave") & filters.private)
 async def leave_chat(client: Client, message: Message):
