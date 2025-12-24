@@ -21,8 +21,10 @@ async def cancel_forward(bot, message):
         track_chat_id = message.chat.id
         if track_chat_id != STATUS_CHAT:
             return    
-    else:
-        track_chat_id = message.from_user.id
+    elif message.chat.type == enums.ChatType.PRIVATE:
+        if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+            return
+    track_chat_id = message.from_user.id
     cancel = await message.reply("Trying to cancel forwarding...")
     if FORWARDING.get(track_chat_id):
         CANCEL[track_chat_id] = True
@@ -95,6 +97,8 @@ async def send_for_forward(bot, message):
                     
 @Client.on_message(filters.private & filters.command(['set_skip']))
 async def set_skip_number(bot, message):
+    if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
+        return
     try:
         _, skip = message.text.split(" ")
     except:
@@ -110,7 +114,7 @@ async def set_skip_number(bot, message):
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
     if Config.ADMINS and not ((str(message.from_user.id) in Config.ADMINS) or (message.from_user.username in Config.ADMINS)):
-        return await message.reply("You Are Not Allowed To Use This UserBot")
+        return
     try:
         _, chat_id = message.text.split(" ")
     except:
