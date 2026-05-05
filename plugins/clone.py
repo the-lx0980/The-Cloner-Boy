@@ -49,6 +49,7 @@ async def show_settings(bot, message):
 
     text = f"""
 ⚙️ <b>Current Bot Settings</b>
+
 📢 <b>Target Channel:</b> <code>{channel}</code>
 ⏱ <b>Delay:</b> <code>{delay}</code> sec
 ⏭ <b>Skip:</b> <code>{skip}</code>
@@ -306,7 +307,7 @@ async def toggle_ai_caption(bot, message):
     user_id = message.from_user.id
     parts = message.text.split(" ")
     if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
-        return await message.reply("Usage: /ai_caption on or /ai_caption off")
+        return await message.reply("Usage: /parse_caption on or /parse_caption off")
     AI_CAPTION[user_id] = (parts[1].lower() == "on")
     await message.reply(f"✅ Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
     
