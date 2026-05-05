@@ -81,7 +81,7 @@ async def forwards_messages(
                 try:
                     caption = await extract_caption(caption)
                 except Exception as e:
-                    logger.error(f"[AI Caption Error] {e}")
+                    logger.error(f"[Caption Error] {e}")
 
             
             if remove_link and caption:
@@ -99,13 +99,13 @@ async def forwards_messages(
             if custom_caption_enabled and custom_caption_text:
                 if caption_position == "start":
                     caption = (
-                        f"{custom_caption_text}\n\n"
+                        f"{custom_caption_text} "
                         f"{caption}"
                     )
 
                 elif caption_position == "end":
                     caption = (
-                        f"{caption}"
+                        f"{caption} "
                         f"{custom_caption_text}"
                     )
 
@@ -125,49 +125,38 @@ async def forwards_messages(
 
             text = message.text or message.caption or ""
 
-            # AI Caption
             if ai_caption and text:
-
                 try:
                     text = await extract_caption(text)
-
                 except Exception as e:
-                    logger.error(f"[AI Text Error] {e}")
+                    logger.error(f"[Text Error] {e}")
 
             # Remove Links
             if remove_link and text:
-
                 text = remove_links(text)
 
             # Replace Text
             if replace_data and text:
-
                 old_text = replace_data.get("old")
                 new_text = replace_data.get("new")
 
                 if old_text:
-
                     text = text.replace(old_text, new_text)
 
             # Custom Caption
             if custom_caption_enabled and custom_caption_text:
-
                 if caption_position == "start":
-
                     text = (
-                        f"{custom_caption_text}\n\n"
+                        f"{custom_caption_text} "
                         f"{text}"
                     )
-
                 elif caption_position == "end":
 
                     text = (
-                        f"{text}"
+                        f"{text} "
                         f"{custom_caption_text}"
                     )
-
                 else:
-
                     text = (
                         f"{text}\n\n"
                         f"{custom_caption_text}"
