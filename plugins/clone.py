@@ -22,6 +22,70 @@ CUSTOM_CAPTION_TEXT = {}
 CAPTION_POSITION = {}
 REPLACE_TEXT = {}
 
+@Client.on_message(filters.private & filters.command(['settings']))
+async def show_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    ai_caption = AI_CAPTION.get(user_id, False)
+    forward_tag = FORWARD_TAG.get(user_id, False)
+    remove_links = REMOVE_LINKS.get(user_id, False)
+    custom_caption = CUSTOM_CAPTION.get(user_id, False)
+    custom_caption_text = CUSTOM_CAPTION_TEXT.get(user_id, "Not Set")
+    caption_position = CAPTION_POSITION.get(user_id, "end_line")
+    replace_data = REPLACE_TEXT.get(user_id)
+    delay = DELAY.get(user_id, 1)
+    skip = CURRENT.get(user_id, 0)
+    channel = CHANNEL.get(user_id, "Not Set")
+
+    if replace_data:
+        replace_text = (
+            f"{replace_data.get('old')} "
+            f"➜ "
+            f"{replace_data.get('new')}"
+        )
+    else:
+        replace_text = "Not Set"
+
+    text = f"""
+⚙️ <b>Current Bot Settings</b>
+
+📢 <b>Target Channel:</b>
+<code>{channel}</code>
+
+⏱ <b>Delay:</b>
+<code>{delay}</code> sec
+
+⏭ <b>Skip:</b>
+<code>{skip}</code>
+
+🤖 <b>AI Caption:</b>
+<code>{'ON' if ai_caption else 'OFF'}</code>
+
+📨 <b>Forward Tag:</b>
+<code>{'ON' if forward_tag else 'OFF'}</code>
+
+🔗 <b>Remove Links:</b>
+<code>{'ON' if remove_links else 'OFF'}</code>
+
+✍️ <b>Custom Caption:</b>
+<code>{'ON' if custom_caption else 'OFF'}</code>
+
+📝 <b>Custom Caption Text:</b>
+<code>{custom_caption_text}</code>
+
+📍 <b>Caption Position:</b>
+<code>{caption_position}</code>
+
+🔄 <b>Replace Text:</b>
+<code>{replace_text}</code>
+"""
+
+    await message.reply(
+        text,
+        disable_web_page_preview=True
+    )
+    
 @Client.on_message(filters.private & filters.command(['forward_tag']))
 async def forward_tag_settings(bot, message):
 
@@ -160,6 +224,7 @@ async def reset_all_settings(bot, message):
     CAPTION_POSITION.pop(user_id, None)
     REPLACE_TEXT.pop(user_id, None)
     DELAY.pop(user_id, None)
+    CHANNEL.pop(user_id, None)
     CURRENT.pop(user_id, None)
 
     await message.reply(
