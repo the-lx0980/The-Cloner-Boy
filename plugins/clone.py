@@ -14,7 +14,158 @@ CANCEL = {}
 DELAY = {}
 FORWARDING = {}
 AI_CAPTION = {}
+AI_CAPTION = {}
+FORWARD_TAG = {}
+REMOVE_LINKS = {}
+CUSTOM_CAPTION = {}
+CUSTOM_CAPTION_TEXT = {}
+CAPTION_POSITION = {}
+REPLACE_TEXT = {}
 
+@Client.on_message(filters.private & filters.command(['forward_tag']))
+async def forward_tag_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    parts = message.text.split(" ")
+
+    if len(parts) != 2:
+        return await message.reply(
+            "Usage:\n/forward_tag on/off"
+        )
+
+    FORWARD_TAG[user_id] = parts[1].lower() == "on"
+
+    await message.reply(
+        f"✅ Forward Tag {'Enabled' if FORWARD_TAG[user_id] else 'Disabled'}"
+    )
+    
+@Client.on_message(filters.private & filters.command(['all_type_link_remove']))
+async def remove_links_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    parts = message.text.split(" ")
+
+    if len(parts) != 2:
+        return await message.reply(
+            "Usage:\n/all_type_link_remove on/off"
+        )
+
+    REMOVE_LINKS[user_id] = parts[1].lower() == "on"
+
+    await message.reply(
+        f"✅ Link Remove {'Enabled' if REMOVE_LINKS[user_id] else 'Disabled'}"
+    )
+        
+@Client.on_message(filters.private & filters.command(['customised_caption']))
+async def customised_caption_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    parts = message.text.split(" ")
+
+    if len(parts) != 2:
+        return await message.reply(
+            "Usage:\n/customised_caption on/off"
+        )
+
+    CUSTOM_CAPTION[user_id] = parts[1].lower() == "on"
+
+    await message.reply(
+        f"✅ Custom Caption {'Enabled' if CUSTOM_CAPTION[user_id] else 'Disabled'}"
+    )
+            
+@Client.on_message(filters.private & filters.command(['add_caption']))
+async def add_custom_caption(bot, message):
+
+    user_id = message.from_user.id
+
+    try:
+        caption = message.text.split(" ", 1)[1]
+    except:
+        return await message.reply(
+            "Usage:\n/add_caption your text"
+        )
+
+    CUSTOM_CAPTION_TEXT[user_id] = caption
+
+    await message.reply("✅ Custom Caption Saved")
+    
+@Client.on_message(filters.private & filters.command(['caption_position']))
+async def caption_position_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    try:
+        position = message.text.split(" ")[1].lower()
+    except:
+        return await message.reply(
+            "Usage:\n/caption_position start/end/end_line"
+        )
+
+    if position not in ["start", "end", "end_line"]:
+        return await message.reply("Invalid Position")
+
+    CAPTION_POSITION[user_id] = position
+
+    await message.reply(
+        f"✅ Caption Position Set To {position}"
+    )
+    
+@Client.on_message(filters.private & filters.command(['replace']))
+async def replace_text_command(bot, message):
+
+    user_id = message.from_user.id
+
+    try:
+        data = message.text.split(" ", 1)[1]
+
+        old_text, new_text = data.split("|", 1)
+
+        old_text = old_text.strip()
+        new_text = new_text.strip()
+
+    except:
+        return await message.reply(
+            "Usage:\n/replace old | new"
+        )
+
+    REPLACE_TEXT[user_id] = {
+        "old": old_text,
+        "new": new_text
+    }
+
+    await message.reply("✅ Replace Text Saved")
+    
+@Client.on_message(filters.private & filters.command(['reset_replace']))
+async def reset_replace(bot, message):
+
+    user_id = message.from_user.id
+
+    REPLACE_TEXT.pop(user_id, None)
+
+    await message.reply("✅ Replace Reset Done")
+    
+@Client.on_message(filters.private & filters.command(['reset_settings']))
+async def reset_all_settings(bot, message):
+
+    user_id = message.from_user.id
+
+    AI_CAPTION.pop(user_id, None)
+    FORWARD_TAG.pop(user_id, None)
+    REMOVE_LINKS.pop(user_id, None)
+    CUSTOM_CAPTION.pop(user_id, None)
+    CUSTOM_CAPTION_TEXT.pop(user_id, None)
+    CAPTION_POSITION.pop(user_id, None)
+    REPLACE_TEXT.pop(user_id, None)
+    DELAY.pop(user_id, None)
+    CURRENT.pop(user_id, None)
+
+    await message.reply(
+        "✅ All Settings Reset Successfully"
+    )
+                                
 @Client.on_message(filters.regex('cancel'))
 async def cancel_forward(bot, message):
     cancel = await message.reply("Trying to cancel forwarding...")
@@ -147,6 +298,12 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     from_chat = chat
     to_chat = CHANNEL.get(user_id)
     ai_caption = AI_CAPTION.get(user_id, False)
+    remove_links = REMOVE_LINKS.get(user_id, False)
+    custom_caption_enabled = CUSTOM_CAPTION.get(user_id, False)
+    custom_caption_text = CUSTOM_CAPTION_TEXT.get(user_id, "")
+    caption_position = CAPTION_POSITION.get(user_id, "end_line")
+    forward_tag = FORWARD_TAG.get(user_id, False)
+    replace_data = REPLACE_TEXT.get(user_id)
     # lst_msg_id is same to total messages
 
     try:
@@ -162,7 +319,19 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                 deleted += 1
                 continue
             try:
-                await forwards_messages(bot, message, from_chat, to_chat, ai_caption)
+                await forwards_messages(
+                    bot,
+                    message,
+                    from_chat,
+                    to_chat,
+                    ai_caption,
+                    remove_links,
+                    custom_caption_enabled,
+                    custom_caption_text,
+                    caption_position,
+                    forward_tag,
+                    replace_data
+                )
             except Exception as e:
                 logger.exception(e)
                 return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
