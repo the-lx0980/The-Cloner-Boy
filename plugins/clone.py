@@ -281,7 +281,7 @@ async def send_for_forward(bot, message):
     if approval.strip() == "yes":
         if FORWARDING.get(message.from_user.id):
             return await message.reply('Wait until previous process complete.')
-        msg = await message.reply('Starting Forwarding...')
+        msg = await message.reply('''Forwarding Started......\nSend "<code>cancel</code>" text to stop''')
         try:
             chat = int(chat_id)
         except:
@@ -321,14 +321,14 @@ async def set_delay_number(bot, message):
     DELAY[message.from_user.id] = int(delay)
     await message.reply(f"Successfully set <code>{delay}</code> delay in second.")
     
-@Client.on_message(filters.private & filters.command(['ai_caption']))
+@Client.on_message(filters.private & filters.command(['parse_caption']))
 async def toggle_ai_caption(bot, message):
     user_id = message.from_user.id
     parts = message.text.split(" ")
     if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
         return await message.reply("Usage: /ai_caption on or /ai_caption off")
     AI_CAPTION[user_id] = (parts[1].lower() == "on")
-    await message.reply(f"✅ AI Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
+    await message.reply(f"✅ Caption Formatter is now <b>{'ENABLED' if AI_CAPTION[user_id] else 'DISABLED'}</b>")
     
 @Client.on_message(filters.private & filters.command(['set_channel']))
 async def set_target_channel(bot, message):    
