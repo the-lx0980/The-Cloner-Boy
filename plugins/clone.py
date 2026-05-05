@@ -49,36 +49,16 @@ async def show_settings(bot, message):
 
     text = f"""
 ⚙️ <b>Current Bot Settings</b>
-
-📢 <b>Target Channel:</b>
-<code>{channel}</code>
-
-⏱ <b>Delay:</b>
-<code>{delay}</code> sec
-
-⏭ <b>Skip:</b>
-<code>{skip}</code>
-
-🤖 <b>AI Caption:</b>
-<code>{'ON' if ai_caption else 'OFF'}</code>
-
-📨 <b>Forward Tag:</b>
-<code>{'ON' if forward_tag else 'OFF'}</code>
-
-🔗 <b>Remove Links:</b>
-<code>{'ON' if remove_links else 'OFF'}</code>
-
-✍️ <b>Custom Caption:</b>
-<code>{'ON' if custom_caption else 'OFF'}</code>
-
-📝 <b>Custom Caption Text:</b>
-<code>{custom_caption_text}</code>
-
-📍 <b>Caption Position:</b>
-<code>{caption_position}</code>
-
-🔄 <b>Replace Text:</b>
-<code>{replace_text}</code>
+📢 <b>Target Channel:</b> <code>{channel}</code>
+⏱ <b>Delay:</b> <code>{delay}</code> sec
+⏭ <b>Skip:</b> <code>{skip}</code>
+🤖 <b>Parse Caption:</b> <code>{'ON' if ai_caption else 'OFF'}</code>
+📨 <b>Forward Tag:</b> <code>{'ON' if forward_tag else 'OFF'}</code>
+🔗 <b>Remove Links:</b> <code>{'ON' if remove_links else 'OFF'}</code>
+✍️ <b>Custom Caption:</b> <code>{'ON' if custom_caption else 'OFF'}</code>
+📝 <b>Custom Caption Text:</b> <code>{custom_caption_text}</code>
+📍 <b>Caption Position:</b> <code>{caption_position}</code>
+🔄 <b>Replace Text:</b> <code>{replace_text}</code>
 """
 
     await message.reply(
