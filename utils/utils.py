@@ -114,7 +114,8 @@ async def forwards_messages(
                         f"{caption}\n\n"
                         f"{custom_caption_text}"
                     )
-            caption = f"**{caption}**"        
+            if caption:
+                caption = f"**{caption}**"        
             await bot.send_cached_media(
                 chat_id=to_chat,
                 file_id=media.file_id,
@@ -175,8 +176,7 @@ async def forwards_messages(
                 await bot.copy_message(
                     chat_id=to_chat,
                     from_chat_id=from_chat,
-                    message_id=message.id,
-                    caption = f"**{message.caption}**"
+                    message_id=message.id
                 )
 
     except FloodWait as e:
@@ -204,8 +204,7 @@ async def forwards_messages(
             await bot.copy_message(
                 chat_id=to_chat,
                 from_chat_id=from_chat,
-                message_id=message.id,
-                caption=f"**{message.caption}**"
+                message_id=message.id
             )
 
         except Exception as e2:
