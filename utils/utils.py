@@ -14,10 +14,11 @@ def remove_links(text):
         return text
 
     patterns = [
-        r"https?://\\S+",
-        r"t\\.me/\\S+",
-        r"@\\w+"
+        r"https?://\S+",
+        r"t\.me/\S+",
+        r"@\w+"
     ]
+
 
     for pattern in patterns:
         text = re.sub(pattern, "", text)
