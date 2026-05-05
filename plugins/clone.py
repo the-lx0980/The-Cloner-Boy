@@ -292,14 +292,14 @@ async def forward_files(lst_msg_id, from_chat, msg, bot, track_chat_id, chat_id_
                         await bot.send_cached_media(
                             chat_id=target_chat,
                             file_id=media.file_id,
-                            caption=message.caption
+                            caption=f"**{message.caption}**"
                         )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
                         await bot.send_cached_media(
                                 chat_id=target_chat,
                                 file_id=media.file_id,
-                                caption=message.caption
+                                caption=f"**{message.caption}**"
                         )
             except Exception as e:
                 logger.exception(e)
