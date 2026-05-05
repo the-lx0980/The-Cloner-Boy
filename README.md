@@ -8,7 +8,7 @@
 </h1>
 
 
-A powerful Telegram forwarding bot with AI captions, custom captions, link remover, replace text system, and advanced forwarding controls.
+**A powerful Telegram forwarding bot with custom captions, link remover, replace text system, and advanced forwarding controls.**
 
 ---
 
