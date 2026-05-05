@@ -48,44 +48,27 @@ async def forwards_messages(
 
     try:
 
-        # =========================
-        # FORWARD TAG MODE
-        # =========================
-
-        # Telegram limitation:
-        # Forward tag ON hone par caption edit nahi ho sakta
-
         if forward_tag:
-
             await bot.forward_messages(
                 chat_id=to_chat,
                 from_chat_id=from_chat,
                 message_ids=message.id
             )
-
             return
 
-        # =========================
-        # MEDIA MESSAGE
-        # =========================
-
         if message.media:
-
             media_type = message.media.value
             media = getattr(message, media_type, None)
 
             # unsupported media fallback
             if not hasattr(media, "file_id"):
-
                 await bot.copy_message(
                     chat_id=to_chat,
                     from_chat_id=from_chat,
                     message_id=message.id
                 )
-
                 return
 
-            # caption get
             caption = (
                 message.caption
                 or getattr(message.video, "file_name", None)
@@ -94,80 +77,49 @@ async def forwards_messages(
                 or ""
             )
 
-            # =========================
-            # AI CAPTION
-            # =========================
-
             if ai_caption and caption:
-
                 try:
                     caption = await extract_caption(caption)
-
                 except Exception as e:
                     logger.error(f"[AI Caption Error] {e}")
 
-            # =========================
-            # REMOVE LINKS
-            # =========================
-
+            
             if remove_link and caption:
-
                 caption = remove_links(caption)
 
-            # =========================
-            # REPLACE TEXT
-            # =========================
-
+            
             if replace_data and caption:
-
                 old_text = replace_data.get("old")
                 new_text = replace_data.get("new")
 
                 if old_text:
-
                     caption = caption.replace(old_text, new_text)
 
-            # =========================
-            # CUSTOM CAPTION
-            # =========================
-
+            
             if custom_caption_enabled and custom_caption_text:
-
                 if caption_position == "start":
-
                     caption = (
                         f"{custom_caption_text}\n\n"
                         f"{caption}"
                     )
 
                 elif caption_position == "end":
-
                     caption = (
                         f"{caption}"
                         f"{custom_caption_text}"
                     )
 
                 else:
-
-                    # end_line
                     caption = (
                         f"{caption}\n\n"
                         f"{custom_caption_text}"
                     )
-
-            # =========================
-            # SEND MEDIA
-            # =========================
 
             await bot.send_cached_media(
                 chat_id=to_chat,
                 file_id=media.file_id,
                 caption=caption if caption else None
             )
-
-        # =========================
-        # NON MEDIA MESSAGE
-        # =========================
 
         else:
 
@@ -237,10 +189,6 @@ async def forwards_messages(
                     message_id=message.id
                 )
 
-    # =========================
-    # FLOODWAIT
-    # =========================
-
     except FloodWait as e:
 
         await asyncio.sleep(e.value)
@@ -259,16 +207,10 @@ async def forwards_messages(
             replace_data
         )
 
-    # =========================
-    # ERROR HANDLER
-    # =========================
-
     except Exception as e:
-
         logger.error(f"[Forward Error] {e}")
 
         try:
-
             await bot.copy_message(
                 chat_id=to_chat,
                 from_chat_id=from_chat,
@@ -276,5 +218,4 @@ async def forwards_messages(
             )
 
         except Exception as e2:
-
             logger.error(f"[Copy Retry Failed] {e2}")
