@@ -12,18 +12,44 @@ async def start(_, m):
         return 
     text = f"""
 👋 Hello {m.from_user.first_name}!
+I can forward messages, documents, videos, and media from a source channel/group to your target channel with advanced caption customization features.
 
-I can forward **documents** and **videos** (mp4/mkv) from a source channel to your target channel.
+**Basic Commands**
 
-**Commands:**
-/set_skip <number> - Skip first messages.
-/set_channel <channel_id> - Set target channel.
-/set_delay <seconds> - Set delay between forwards.
-/ai_caption on/off - Enable/disable AI caption formatting.
-/stop - restart the bot.
-/id - get users id and chat id. 
+/set_channel - Set target channel where files will be forwarded.
+/set_delay - Set delay between each forwarded message in second.
+/set_skip - Skip messages from the beginning.
+    Example: <code>/set_skip 100</code>
+<code>cancel<code> - ⬅️ Stop current forwarding process.
+/settings - Show current bot settings.
+/reset_settings - Reset all saved settings.
+/parse_caption - on/off This converts messy file names into clean professional captions.
+/customised_caption on/off custom caption system.
+/add_caption - Add your custom caption text.
+/caption_position start/end/end_line
+   start - Add custom caption before old caption.
+   end -:Add custom caption directly at end.
+   end_line - Add custom caption at end with blank line.
+/all_type_link_remove on/off
+    Remove: 
+      http links, 
+      https links
+      t.me links
+      telegram usernames
+/replace old | new (Replace text inside captions.)
+/reset_replace - Remove replace settings.
+/forward_tag - on/off Forward original Telegram message with forward tag.
+/id - Get your user ID and chat ID.
+/stop - Restart the bot.
 
-⚠️ Note: Your settings are temporary. If the bot restarts, forwarding stops and settings are lost.
+⚠️ Important 
+• When Forward Tag is ON: Parse Caption, Link Remover, Replace Text, Custom Caption will not work because Telegram forwards the original message directly.
+• All settings are temporary.
+• If the bot restarts, settings will be lost.
+• Send a Telegram post link or forward a message to start forwarding.
+
+Example:
+<code>https://t.me/channel/123</code>
 """
     await m.reply(text)
     
