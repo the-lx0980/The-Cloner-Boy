@@ -218,21 +218,21 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                         await bot.send_cached_media(
                             chat_id=CHANNEL.get(user_id),
                             file_id=media.file_id,
-                            caption=message.caption
+                            caption=f"**{message.caption}**"
                         )
                     except FloodWait as e:
                         await asyncio.sleep(e.value)  # Wait "value" seconds before continuing
                         await bot.send_cached_media(
                                 chat_id=CHANNEL.get(user_id),
                                 file_id=media.file_id,
-                                caption=message.caption
+                                caption=f"**{message.caption}**"
                         )
                 else:
                     try:
                         await bot.copy_message(
                             chat_id=CHANNEL.get(user_id),
                             from_chat_id=chat,
-                            caption=message.caption,
+                            caption=f"**{message.caption}**",
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
                         )
@@ -241,7 +241,7 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                         await bot.copy_message(
                             chat_id=CHANNEL.get(user_id),
                             from_chat_id=chat,
-                            caption=message.caption,
+                            caption=f"**{message.caption}**",
                             message_id=message.id,
                             parse_mode=enums.ParseMode.MARKDOWN
                         )
