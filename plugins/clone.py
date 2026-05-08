@@ -1,6 +1,7 @@
 import asyncio
 import re 
 import logging
+from PTT import parse_title
 from pyrogram.enums import MessageMediaType
 from pyrogram import Client, filters, enums
 from config import Config
@@ -14,13 +15,76 @@ CANCEL = {}
 DELAY = {}
 FORWARDING = {}
 AI_CAPTION = {}
-AI_CAPTION = {}
 FORWARD_TAG = {}
 REMOVE_LINKS = {}
 CUSTOM_CAPTION = {}
 CUSTOM_CAPTION_TEXT = {}
 CAPTION_POSITION = {}
 REPLACE_TEXT = {}
+COPY_MOVIES_ONLY = {}
+COPY_SERIES_ONLY = {}
+
+@Client.on_message(filters.private & filters.command(['copy_movies_only']))
+async def copy_movies_only(bot, message):
+
+    if Config.ADMINS and not (
+        (str(message.from_user.id) in Config.ADMINS)
+        or (message.from_user.username in Config.ADMINS)
+    ):
+        return await message.reply(
+            "You Are Not Allowed To Use This UserBot"
+        )
+
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply(
+            "Usage:\n/copy_movies_only on/off"
+        )
+
+    if COPY_SERIES_ONLY.get(user_id):
+        COPY_SERIES_ONLY[user_id] = False
+
+    COPY_MOVIES_ONLY[user_id] = (
+        parts[1].lower() == "on"
+    )
+
+    await message.reply(
+        f"✅ Copy Movies Only "
+        f"{'Enabled' if COPY_MOVIES_ONLY[user_id] else 'Disabled'}"
+    )
+    
+ @Client.on_message(filters.private & filters.command(['copy_series_only']))
+async def copy_series_only(bot, message):
+
+    if Config.ADMINS and not (
+        (str(message.from_user.id) in Config.ADMINS)
+        or (message.from_user.username in Config.ADMINS)
+    ):
+        return await message.reply(
+            "You Are Not Allowed To Use This UserBot"
+        )
+
+    user_id = message.from_user.id
+    parts = message.text.split(" ")
+
+    if len(parts) != 2 or parts[1].lower() not in ["on", "off"]:
+        return await message.reply(
+            "Usage:\n/copy_series_only on/off"
+        )
+
+    if COPY_MOVIES_ONLY.get(user_id):
+        COPY_MOVIES_ONLY[user_id] = False
+
+    COPY_SERIES_ONLY[user_id] = (
+        parts[1].lower() == "on"
+    )
+
+    await message.reply(
+        f"✅ Copy Series Only "
+        f"{'Enabled' if COPY_SERIES_ONLY[user_id] else 'Disabled'}"
+    )   
 
 @Client.on_message(filters.private & filters.command(['settings']))
 async def show_settings(bot, message):
@@ -37,6 +101,8 @@ async def show_settings(bot, message):
     delay = DELAY.get(user_id, 1)
     skip = CURRENT.get(user_id, 0)
     channel = CHANNEL.get(user_id, "Not Set")
+    copy_movies = COPY_MOVIES_ONLY.get(user_id, False)
+    copy_series = COPY_SERIES_ONLY.get(user_id, False)
 
     if replace_data:
         replace_text = (
@@ -60,6 +126,8 @@ async def show_settings(bot, message):
 📝 <b>Custom Caption Text:</b> <code>{custom_caption_text}</code>
 📍 <b>Caption Position:</b> <code>{caption_position}</code>
 🔄 <b>Replace Text:</b> <code>{replace_text}</code>
+🎬 <b>Movies Only:</b> <code>{'ON' if copy_movies else 'OFF'}</code>
+📺 <b>Series Only:</b> <code>{'ON' if copy_series else 'OFF'}</code>
 """
 
     await message.reply(
@@ -207,6 +275,8 @@ async def reset_all_settings(bot, message):
     DELAY.pop(user_id, None)
     CHANNEL.pop(user_id, None)
     CURRENT.pop(user_id, None)
+    COPY_MOVIES_ONLY.pop(user_id, None)
+    COPY_SERIES_ONLY.pop(user_id, None)
 
     await message.reply(
         "✅ All Settings Reset Successfully"
@@ -350,20 +420,90 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
     caption_position = CAPTION_POSITION.get(user_id, "end_line")
     forward_tag = FORWARD_TAG.get(user_id, False)
     replace_data = REPLACE_TEXT.get(user_id)
+    copy_movies = COPY_MOVIES_ONLY.get(user_id, False)
+    copy_series = COPY_SERIES_ONLY.get(user_id, False)
     # lst_msg_id is same to total messages
 
     try:
-        async for message in bot.iter_messages(chat, lst_msg_id, CURRENT.get(user_id) if CURRENT.get(user_id) else 0):
+        async for message in bot.iter_messages(
+            chat,
+            lst_msg_id,
+            CURRENT.get(user_id) if CURRENT.get(user_id) else 0
+        ):
+            # cancel forwarding
             if CANCEL.get(user_id):
-                await msg.edit(f"Successfully Forward Canceled!")
+                FORWARDING[user_id] = False
+                await msg.edit(
+                    "Successfully Forward Canceled!"
+                )
+
                 break
+
             current += 1
             fetched += 1
+
+            # progress update
             if current % 20 == 0:
-                await msg.edit_text(text=f'''Forward Processing...\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nForwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>\n\n send "<code>cancel</code>" for stop''')
+
+                await msg.edit_text(
+                    text=f'''
+Forward Processing...
+Total Messages: <code>{lst_msg_id}</code>
+Completed Messages: <code>{current} / {lst_msg_id}</code>
+Forwarded Files: <code>{forwarded}</code>
+Deleted Messages Skipped: <code>{deleted}</code>
+Non Media Files: <code>{unsupported}</code>
+send "<code>cancel</code>" for stop
+'''
+                )
+
+            # deleted message
             if message.empty:
                 deleted += 1
                 continue
+                
+            if copy_movies or copy_series:
+
+                # skip non media
+                if not message.media:
+                    unsupported += 1
+                    continue
+
+                # allow only document/video
+                if message.media not in [
+                    MessageMediaType.DOCUMENT,
+                    MessageMediaType.VIDEO
+                ]:
+                    unsupported += 1
+                    continue
+
+                title = (
+                    message.caption
+                    or getattr(message.video, "file_name", None)
+                    or getattr(message.document, "file_name", None)
+                    or ""
+                )
+
+                data = parse_title(
+                    title,
+                    translate_languages=True
+                )
+
+                seasons = data.get("seasons", [])
+                episodes = data.get("episodes", [])
+
+                is_series = bool(seasons or episodes)
+
+                # skip series while copying movies
+                if copy_movies and is_series:
+                    unsupported += 1
+                    continue
+
+                # skip movies while copying series
+                if copy_series and not is_series:
+                    unsupported += 1
+                    continue
+
             try:
                 await forwards_messages(
                     bot,
@@ -378,16 +518,35 @@ async def forward_files(lst_msg_id, chat, msg, bot, user_id):
                     forward_tag,
                     replace_data
                 )
+
+                forwarded += 1
+                
             except Exception as e:
                 logger.exception(e)
-                return await msg.reply(f"Forward Canceled!\n\nError - {e}") 
                 FORWARDING[user_id] = False
+                await msg.reply(
+                    f"Forward Canceled!\n\nError - {e}"
+                )
+
                 break
-            forwarded += 1
-            await asyncio.sleep(delay)            
+
+            await asyncio.sleep(delay)
     except Exception as e:
         logger.exception(e)
-        await msg.reply(f"Forward Canceled!\n\nError - {e}")
-    else:
-        await msg.edit(f'Forward Completed!\n\nTotal Messages: <code>{lst_msg_id}</code>\nCompleted Messages: <code>{current} / {lst_msg_id}</code>\nFetched Messages: <code>{fetched}</code>\nTotal Forwarded Files: <code>{forwarded}</code>\nDeleted Messages Skipped: <code>{deleted}</code>\nNon Media Files: <code>{unsupported}</code>')
         FORWARDING[user_id] = False
+        await msg.reply(
+            f"Forward Canceled!\n\nError - {e}"
+        )
+    else:
+        FORWARDING[user_id] = False
+        await msg.edit(
+            f'''
+Forward Completed!
+Total Messages: <code>{lst_msg_id}</code>
+Completed Messages: <code>{current} / {lst_msg_id}</code>
+Fetched Messages: <code>{fetched}</code>
+Total Forwarded Files: <code>{forwarded}</code>
+Deleted Messages Skipped: <code>{deleted}</code>
+Non Media Files: <code>{unsupported}</code>
+'''
+        )
