@@ -55,7 +55,7 @@ async def copy_movies_only(bot, message):
         f"{'Enabled' if COPY_MOVIES_ONLY[user_id] else 'Disabled'}"
     )
     
- @Client.on_message(filters.private & filters.command(['copy_series_only']))
+@Client.on_message(filters.private & filters.command(['copy_series_only']))
 async def copy_series_only(bot, message):
 
     if Config.ADMINS and not (
