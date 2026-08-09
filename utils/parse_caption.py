@@ -1,115 +1,185 @@
-import logging
 import re
-from PTT import parse_title
+import unicodedata
 
-logger = logging.getLogger(__name__)
 
-def extract_caption(title: str) -> str:
-    """
-    Parse torrent title using Parsett (PTT) with corrected resolution/source override priority.
-    """
-    if not title or len(title.strip()) < 3:
-        return title
+FILE_INFO_PATTERNS = [
+    r"\baudio\b", r"\bsubtitle\b", r"\besub\b", r"\bsub\b",
+    r"\baac\b", r"\bac3\b", r"\be-?ac3\b", r"\bddp?\b",
+    r"\bdts\b", r"\batmos\b", r"\bflac\b", r"\bmp3\b",
+    r"\bx264\b", r"\bx265\b", r"\bhevc\b", r"\bavc\b",
+    r"\bweb[- ]?dl\b", r"\bwebrip\b", r"\bbluray\b",
+    r"\bhdrip\b", r"\bremux\b", r"\b2160p\b", r"\b1080p\b",
+    r"\b720p\b", r"\b480p\b", r"\bhindi\b", r"\benglish\b",
+    r"\btamil\b", r"\btelugu\b", r"\bmalayalam\b",
+    r"\bkannada\b", r"\bjapanese\b", r"\bkorean\b",
+    r"\bchinese\b", r"\bdual audio\b", r"\bmulti\b",
+    r"\bchapters?\b"
+]
 
-    try:
-        data = parse_title(title, translate_languages=True)
-        name = data.get("title") or ""
-        year = data.get("year")
-        seasons = data.get("seasons") or []
-        episodes = data.get("episodes") or []
-        type_ = "series" if seasons else "movie"
 
-        # Base values from PTT
-        resolution = data.get("resolution", "")
-        quality = data.get("quality", "")
-        codec = (data.get("codec", "") or "").lower()
-        bit_depth = data.get("bit_depth", "")
-        channels_list = data.get("channels", [])
-        channels = ", ".join(channels_list)
+def remove_emojis(text):
+    # Removes all standard emojis, symbols, and pictographs
+    emoji_pattern = re.compile(
+        r"["
+        r"\U0001f300-\U0001f5ff"  # Symbols & Pictographs
+        r"\U0001f600-\U0001f64f"  # Emoticons
+        r"\U0001f680-\U0001f6ff"  # Transport & Map Symbols
+        r"\U0001f1e0-\U0001f1ff"  # Flags (iOS)
+        r"\U00002702-\U000027b0"  # Dingbats
+        r"\U000024c2-\U0001f251"
+        r"\U0001f900-\U0001f9ff"  # Supplemental Symbols and Pictographs
+        r"\U0001fa70-\U0001faff"  # Symbols and Pictographs Extended-A
+        r"\U00002600-\U000026ff"  # Miscellaneous Symbols
+        r"]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.sub("", text)
 
-        t_lower = title.lower()
 
-        # ✅ 1. Resolution Manual Fix (takes priority)
-        match_res = re.search(r"(480p|720p|1080p|2160p|4k)", t_lower)
-        if match_res:
-            resolution = match_res.group(1)
+def remove_fancy_fonts(text):
+    result = []
+    for ch in text:
+        cp = ord(ch)
+        name = unicodedata.name(ch, "")
 
-        # ✅ 2. Source Detection (NF / AMZN / WEBRip / HDRip / BluRay / DS4K)
-        source_tags = [
-            ("ds4k", "DS4K"),
-            ("nf", "NF"),
-            ("amzn", "AMZN"),
-            ("web-dl", "WEB-DL"),
-            ("webrip", "WEBRip"),
-            ("hdrip", "HDRip"),
-            ("bluray", "BluRay"),
-            ("bdrip", "BDRip")
-        ]
-        source = ""
-        for tag, name_ in source_tags:
-            if tag in t_lower:
-                source = name_
-                break
+        # Mathematical Alphanumeric Symbols
+        if 0x1D400 <= cp <= 0x1D7FF:
+            continue
 
-        # ✅ 3. Combine source + quality properly
-        quality_final = source if source else ""
-        if quality and source.lower() not in quality.lower():
-            quality_final = f"{quality_final} {quality}".strip()
+        # Fullwidth ASCII
+        if 0xFF01 <= cp <= 0xFF5E:
+            continue
 
-        # --- Audio + Language Formatting ---
-        audio_list = data.get("audio", [])
-        languages = data.get("languages", [])
+        # Enclosed Alphanumerics
+        if 0x2460 <= cp <= 0x24FF:
+            continue
 
-        def clean_audio_name(name: str) -> str:
-            name = name.replace("Dolby Digital Plus", "DD+")
-            name = name.replace("Dolby Digital", "DD")
-            name = name.replace("Dolby TrueHD", "TrueHD")
-            name = name.replace("Dolby Atmos", "Atmos")
-            name = name.replace("DTS-HD MA", "DTS HD MA")
-            return name.strip()
+        # Enclosed Alphanumeric Supplement
+        if 0x1F100 <= cp <= 0x1F1FF:
+            continue
 
-        audio_list = [clean_audio_name(a) for a in audio_list]
+        # Squared / Negative Squared letters
+        if (
+            "SQUARED LATIN" in name
+            or "NEGATIVE SQUARED LATIN" in name
+            or "CIRCLED LATIN" in name
+            or "PARENTHESIZED LATIN" in name
+            or "MATHEMATICAL" in name
+            or "FULLWIDTH" in name
+        ):
+            continue
+        result.append(ch)
+    return "".join(result)
+    
+def is_file_info(text):
+    text = text.lower()
+    return any(re.search(pattern, text) for pattern in FILE_INFO_PATTERNS)
+    
+    
+def extract_caption(file_name):
+    """Clean and format the file name."""
 
-        # Audio format priority
-        audio_fmt = ""
-        for fmt in ["Atmos", "TrueHD", "DD+", "DD", "DTS HD MA", "AAC", "FLAC"]:
-            if any(fmt.lower() in a.lower() for a in audio_list):
-                audio_fmt = fmt
-                break
+    file_name = str(file_name)
+    
+    # Remove all types of emojis first
+    file_name = remove_emojis(file_name)
+    
+    file_name = remove_fancy_fonts(str(file_name))
 
-        # Add channels
-        if channels_list:
-            ch_info = channels_list[0]
-            if audio_fmt:
-                audio_fmt = f"{audio_fmt} {ch_info}"
+    # Keep filename + file info blocks, remove promotional blocks
+    parts = re.split(r"\r?\n\s*\r?\n", file_name.strip())
+    cleaned_parts = [parts[0]]
 
-        # --- Language Format ---
-        if languages:
-            lang_text = " + ".join(languages)
-            audio_lang = f"Multi Audio ({lang_text})" if len(languages) > 1 else languages[0]
+    for part in parts[1:]:
+        if is_file_info(part):  # Imported from FILE_INFO_PATTERNS
+            cleaned_parts.append(part)
         else:
-            audio_lang = ""
+            break
 
-        # --- Year format ---
-        year_str = f"({year})" if year else ""
+    file_name = "\n\n".join(cleaned_parts)
 
-        # --- Final caption ---
-        if type_ == "series":
-            season_no = seasons[0] if seasons else 1
-            if episodes:
-                ep_part = f"E{episodes[0]:02d}" if len(episodes) == 1 else f"E{episodes[0]:02d}–E{episodes[-1]:02d}"
-            else:
-                ep_part = "Complete"
-            formatted = f"{name} {year_str} S{season_no:02d} {ep_part} {resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
-        else:
-            formatted = f"{name} {year_str} {resolution} {quality_final} {bit_depth} {codec} {audio_fmt} {audio_lang}"
+    # Remove links anywhere in the text
+    file_name = re.sub(
+        r"https?://\S+|www\.\S+|t\.me/\S+", "", file_name, flags=re.I
+    )
 
-        # ✅ Ensure correct extension
-        if not re.search(r"\.(mkv|mp4|avi|mov)$", formatted, re.I):
-            formatted += " .mkv"
+    # Remove usernames in brackets
+    file_name = re.sub(r"\[\s*@[^]]+\]", "", file_name)
+    file_name = re.sub(r"\(\s*@[^)]+\)", "", file_name)
+    # (2025) -> 2025
+    # (1950) -> 1950
+    file_name = re.sub(r"\(((?:19|20)\d{2})\)", r"\1", file_name)
+    
+    # Remove username at the beginning
+    file_name = re.sub(r"^\s*@\S+\s*[-:|]?\s*", "", file_name)
 
-        return " ".join(formatted.split())
+    # ---------------- Protect patterns ----------------
 
-    except Exception as e:
-        logger.exception(f"Caption extraction failed: {e}")
-        return title
+    # Protect audio channels: 5.1, 2.0, 7.1
+    file_name = re.sub(r"(?<=\d)\.(?=\d)", "<DOT>", file_name)
+
+    # Protect episode ranges:
+    # E45-50, E45 - 50, Ep01-06, Episode 57 - 67, 56-89
+    file_name = re.sub(
+        r"(?i)\b(?:"
+        r"s\d+\s*e(?:p)?\d+"            # S01E06, S01Ep06
+        r"|s\d+\s*e(?:p)?\d+\s*-\s*e?(?:p)?\d+"  # S01E06-E10
+        r"|e(?:p(?:isode)?)?\s*\d+"     # E06, Ep06, Episode 06
+        r"|\d+"                         # 06
+        r")\s*-\s*\d+\b",
+        lambda m: m.group(0).replace("-", "<DASH>"),
+        file_name,
+    )
+
+    # Protect language blocks inside [] and ()
+    def protect_language_block(match):
+        text = match.group(0)
+        text = text.replace("-", "<DASH>")
+        text = text.replace("+", "<PLUS>")
+        return text
+
+    LANG_WORDS = (
+        r"Hindi|English|Tamil|Telugu|Malayalam|Kannada|Japanese|Korean|Chinese|"
+        r"French|German|Spanish|Italian|Russian|Arabic|Punjabi|Bengali|Gujarati|"
+        r"Marathi|Urdu|Odia|Line|Thai|Indonesian|"
+        r"Hin|Eng|Tam|Tel|Mal|Jap|Kor|Thai"
+    )
+
+    file_name = re.sub(
+        rf"\[[^\]]*(?:{LANG_WORDS})[^\]]*\]",
+        protect_language_block,
+        file_name,
+        flags=re.I,
+    )
+
+    file_name = re.sub(
+        rf"\([^\)]*(?:{LANG_WORDS})[^\)]*\)",
+        protect_language_block,
+        file_name,
+        flags=re.I,
+    )
+
+    # Protect short-word pairs like HE-AAC, WEB-DL, HD-TC
+    file_name = re.sub(
+        r"\b(?!@)([A-Za-z]{1,5})-([A-Za-z]{1,5})\b",
+        lambda m: f"{m.group(1)}<DASH>{m.group(2)}",
+        file_name,
+    )
+
+    # ---------------- Replace separators ----------------
+
+    file_name = re.sub(r"[_.+-]", " ", file_name)
+
+    # ---------------- Restore protected patterns ----------------
+
+    file_name = (
+        file_name.replace("<DOT>", ".")
+        .replace("<DASH>", "-")
+        .replace("<PLUS>", "+")
+    )
+    # Remove any remaining @user tokens
+    file_name = " ".join(
+        word for word in file_name.split() if not word.startswith("@")
+    )
+
+    return file_name.strip()
