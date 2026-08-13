@@ -9,6 +9,13 @@ from pyrogram.enums import ParseMode
 from config import Config
 from database import db, ensure_user, is_admin, get_user_targets
 
+# Import all handlers
+from handlers import target_handlers
+from handlers import settings_handlers
+from handlers import text_input_handlers
+from handlers import source_handler
+
+
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
