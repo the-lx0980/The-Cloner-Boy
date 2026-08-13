@@ -2,7 +2,7 @@
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from loader import app
+from bot import app
 from database import is_admin, update_target_settings, get_target
 from handlers.keyboards import target_settings_keyboard, simple_back_keyboard
 import logging
