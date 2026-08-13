@@ -8,14 +8,6 @@ from pyrogram.enums import ParseMode
 from config import Config
 from database import db, ensure_user, is_admin, get_user_targets
 
-# ==================== IMPORTANT: Load all handlers ====================
-# Yeh lines zaroori hain taaki decorators register ho jayein
-import handlers.target_handlers
-import handlers.settings_handlers
-import handlers.text_input_handlers
-import handlers.source_handler
-# =====================================================================
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s",
@@ -33,11 +25,13 @@ app = Client(
     api_hash=Config.API_HASH,
     bot_token=Config.BOT_TOKEN,
     parse_mode=ParseMode.HTML,
-    in_memory=True
+    in_memory=True,
+    plugins=dict(root="handlers")          # ← Important
 )
 
 
-# ==================== START HANDLERS (already working) ====================
+# ==================== START HANDLERS ====================
+# (yeh @app se hain isliye plugins ke baad bhi theek rahenge)
 
 @app.on_message(filters.private & filters.command("start"))
 async def start_handler(client: Client, message: Message):
@@ -143,12 +137,6 @@ This is an advanced **Multi-Target Forward Bot**.
 /targets — Manage targets
 /addtarget — Add new target
 /start — This message
-
-**How to use**
-1. Add targets via /targets
-2. Configure settings for each target
-3. Send source link or forward a message
-4. Select target → Forwarding starts
 """
 
     buttons = [
