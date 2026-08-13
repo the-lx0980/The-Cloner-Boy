@@ -2,6 +2,8 @@
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from pyrogram.enums import ChatType
+
 from database import is_admin, update_target_settings, get_target
 from handlers.keyboards import target_settings_keyboard, simple_back_keyboard
 import logging
@@ -28,8 +30,11 @@ async def handle_settings_input(client: Client, message: Message):
                 chat_id = int(text)
                 chat = await client.get_chat(chat_id)
 
-            if chat.type not in ["channel", "supergroup", "group"]:
+          
+            # Check if the chat is NOT a channel, supergroup, or group
+            if message.chat.type not in [ChatType.CHANNEL, ChatType.SUPERGROUP, ChatType.GROUP]:
                 return await message.reply("❌ Only Channels and Groups are supported.")
+    
 
             from database import add_target
             result = add_target(
