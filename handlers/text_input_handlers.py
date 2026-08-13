@@ -32,7 +32,7 @@ async def handle_settings_input(client: Client, message: Message):
 
           
             # Check if the chat is NOT a channel, supergroup, or group
-            if message.chat.type not in [ChatType.CHANNEL, ChatType.SUPERGROUP, ChatType.GROUP]:
+            if chat.type not in [ChatType.CHANNEL, ChatType.SUPERGROUP, ChatType.GROUP]:
                 return await message.reply("❌ Only Channels and Groups are supported.")
     
 
