@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@Client.on_message(filters.private & filters.text & \~filters.command(["start", "targets", "addtarget", "cancel"]))
+@Client.on_message(filters.private & filters.text & ~filters.command(["start", "targets", "addtarget", "cancel"]))
 async def handle_settings_input(client: Client, message: Message):
     user_id = message.from_user.id
     if not is_admin(user_id):
