@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional, Union
 
 from config import Config as config
 from database import db
-from f_logging import LOGGER
+from logging import LOGGER
 from handlers import ALL_MODULES
 from pyrogram import Client, idle, types
 
