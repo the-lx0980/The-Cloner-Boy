@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ==================== COMMANDS ====================
 
-@app.on_message(filters.private & filters.command("targets"))
+@Client.on_message(filters.private & filters.command("targets"))
 async def cmd_targets(client: Client, message: Message):
     if not is_admin(message.from_user.id):
         return await message.reply("❌ You are not allowed to use this bot.")
@@ -40,7 +40,7 @@ async def cmd_targets(client: Client, message: Message):
     await message.reply(text, reply_markup=targets_list_keyboard(targets))
 
 
-@app.on_message(filters.private & filters.command("addtarget"))
+@Client.on_message(filters.private & filters.command("addtarget"))
 async def cmd_add_target(client: Client, message: Message):
     if not is_admin(message.from_user.id):
         return await message.reply("❌ You are not allowed to use this bot.")
@@ -57,7 +57,7 @@ async def cmd_add_target(client: Client, message: Message):
 
 # ==================== CALLBACKS ====================
 
-@app.on_callback_query(filters.regex(r"^tg:"))
+@Client.on_callback_query(filters.regex(r"^tg:"))
 async def target_callbacks(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
     if not is_admin(user_id):
