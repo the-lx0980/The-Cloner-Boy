@@ -4,7 +4,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ChatType
 from pyrogram.errors import FloodWait
-
+from bot import app
 from database import (
     ensure_user, is_admin, add_target, get_user_targets,
     get_target, delete_target, update_target_settings
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ==================== COMMANDS ====================
 
-@Client.on_message(filters.private & filters.command("targets"))
+@app.on_message(filters.private & filters.command("targets"))
 async def cmd_targets(client: Client, message: Message):
     if not is_admin(message.from_user.id):
         return await message.reply("❌ You are not allowed to use this bot.")
@@ -40,7 +40,7 @@ async def cmd_targets(client: Client, message: Message):
     await message.reply(text, reply_markup=targets_list_keyboard(targets))
 
 
-@Client.on_message(filters.private & filters.command("addtarget"))
+@app.on_message(filters.private & filters.command("addtarget"))
 async def cmd_add_target(client: Client, message: Message):
     if not is_admin(message.from_user.id):
         return await message.reply("❌ You are not allowed to use this bot.")
@@ -57,7 +57,7 @@ async def cmd_add_target(client: Client, message: Message):
 
 # ==================== CALLBACKS ====================
 
-@Client.on_callback_query(filters.regex(r"^tg:"))
+@app.on_callback_query(filters.regex(r"^tg:"))
 async def target_callbacks(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
     if not is_admin(user_id):
