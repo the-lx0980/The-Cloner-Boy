@@ -2,18 +2,12 @@
 # Compatible with kurigram 2.2.24 + Python 3.14 + Render
 
 import logging
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, LinkPreviewOptions
+from pyrogram import Client, filters, idle
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ParseMode
 
 from config import Config
 from database import db, ensure_user, is_admin, get_user_targets
-from loader import app  # ← This is the single source of truth app instance!
-
-# Import all handlers to register their @app listeners
-from handlers import target_handlers
-from handlers import settings_handlers
-from handlers import text_input_handlers
-from handlers import source_handler
 
 # Logging setup
 logging.basicConfig(
@@ -26,7 +20,18 @@ logger = logging.getLogger(__name__)
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("pymongo").setLevel(logging.WARNING)
 
-preview_config = LinkPreviewOptions(is_disabled=True)
+
+# ==================== CLIENT ====================
+
+app = Client(
+    name="ForwardBot",
+    api_id=Config.API_ID,
+    api_hash=Config.API_HASH,
+    bot_token=Config.BOT_TOKEN,
+    parse_mode=ParseMode.HTML,
+    in_memory=True
+)
+
 
 # ==================== HANDLERS ====================
 
@@ -69,10 +74,10 @@ This is an advanced **Multi-Target Forward Bot**.
     ])
 
     if hasattr(message_or_query, "edit_text"):  # CallbackQuery
-        await message_or_query.message.edit_text(text, reply_markup=buttons, link_preview_options=preview_config)
+        await message_or_query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
         await message_or_query.answer()
     else:  # Message
-        await message_or_query.reply(text, reply_markup=buttons, link_preview_options=preview_config)
+        await message_or_query.reply(text, reply_markup=buttons, disable_web_page_preview=True)
 
 
 @app.on_message(filters.private & filters.command("start"))
@@ -97,4 +102,4 @@ if __name__ == "__main__":
         raise
 
     logger.info("Starting bot with kurigram 2.2.24...")
-    app.run()  # Launches the shared app instance with all handlers loaded
+    app.run()   # ← YEH SAHI TARIKA HAI (no argument)
