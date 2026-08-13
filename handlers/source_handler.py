@@ -5,7 +5,8 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ChatType, MessageMediaType
-from bot import app
+
+
 from database import is_admin, get_user_targets, get_target, ensure_user
 from core.forwarder import forward_messages
 from handlers.keyboards import targets_list_keyboard
