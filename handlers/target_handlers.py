@@ -4,7 +4,6 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ChatType
 from pyrogram.errors import FloodWait
-from bot import app
 from database import (
     ensure_user, is_admin, add_target, get_user_targets,
     get_target, delete_target, update_target_settings
