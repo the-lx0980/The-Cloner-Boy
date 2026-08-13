@@ -1,15 +1,19 @@
+import os
+import sys
+
+# Automatic root directory setup to fix 'No module named' errors
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import asyncio
 import importlib
 import logging
-import sys
-import time 
-
+import time
 from typing import AsyncGenerator, Optional, Union
 
+from botlogger import LOGGER
 from config import Config as config
 from database import db
-from botlogger import LOGGER
-from handlers import ALL_MODULES
+from handlers import ALL_MODULES  # Loaded correctly from handlers
 from pyrogram import Client, idle, types
 
 # ==================== LOGGING SETUP ====================
@@ -90,18 +94,19 @@ app = Bot()
 
 # ==================== BOOT & STARTUP LOGIC ====================
 async def boot():
-    """Bootstraps, loads modules, and runs the Telegram bot."""
+    """Bootstraps, loads handlers, and runs the Telegram bot."""
     LOGGER(__name__).info("Bot is starting...")
     await app.start()
     LOGGER(__name__).info("Bot started successfully.")
 
-    # Dynamically load all modules/plugins after app has started
+    # Dynamically load all handlers after app has started
     for module in ALL_MODULES:
         try:
-            importlib.import_module(f"modules.{module}")
-            LOGGER(__name__).info(f"Successfully loaded module: {module}")
+            # FIXED: Changed from 'modules.' to 'handlers.'
+            importlib.import_module(f"handlers.{module}")
+            LOGGER(__name__).info(f"Successfully loaded handler: {module}")
         except Exception as e:
-            LOGGER(__name__).error(f"Failed to load module {module}: {e}")
+            LOGGER(__name__).error(f"Failed to load handler {module}: {e}")
 
     try:
         await idle()
