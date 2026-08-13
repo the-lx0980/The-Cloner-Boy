@@ -3,7 +3,7 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ParseMode
-from loader import app
+from bot import app
 from database import (
     is_admin, get_target, update_target_settings, get_setting
 )
