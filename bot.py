@@ -8,6 +8,7 @@ from pyrogram.enums import ParseMode
 
 from config import Config
 from database import db, ensure_user, is_admin, get_user_targets
+from loader import app
 
 # Import all handlers
 from handlers import target_handlers
