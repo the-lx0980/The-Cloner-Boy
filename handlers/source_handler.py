@@ -56,7 +56,7 @@ def build_target_selector_keyboard(targets: list, source_chat_id, last_msg_id: i
 # 1. Detect Source (Link or Forwarded Message)
 # ============================================================
 
-@app.on_message(
+@Client.on_message(
     filters.private
     & filters.incoming
     & (
@@ -147,7 +147,7 @@ async def source_detector(client: Client, message: Message):
 # 2. Target Selection Callbacks
 # ============================================================
 
-@app.on_callback_query(filters.regex(r"^fwd:"))
+@Client.on_callback_query(filters.regex(r"^fwd:"))
 async def forward_callbacks(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
 
@@ -279,7 +279,7 @@ async def forward_callbacks(client: Client, query: CallbackQuery):
 # 3. Cancel Command / Message
 # ============================================================
 
-@app.on_message(filters.private & filters.regex(r"(?i)^cancel$"))
+@Client.on_message(filters.private & filters.regex(r"(?i)^cancel$"))
 async def cancel_forward(client: Client, message: Message):
     user_id = message.from_user.id
 
