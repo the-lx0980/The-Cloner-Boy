@@ -2,7 +2,7 @@
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
-
+from bot import app
 from database import ensure_user, is_admin, get_user_targets
 
 
@@ -82,17 +82,17 @@ This is an advanced **Multi-Target Forward Bot** with powerful per-target settin
         )
 
 
-@Client.on_message(filters.private & filters.command("start"))
+@app.on_message(filters.private & filters.command("start"))
 async def start_handler(client: Client, message: Message):
     await send_start_menu(client, message.from_user, message)
 
 
-@Client.on_callback_query(filters.regex(r"^back_to_start$"))
+@app.on_callback_query(filters.regex(r"^back_to_start$"))
 async def back_to_start(client: Client, query: CallbackQuery):
     await send_start_menu(client, query.from_user, query)
 
 
-@Client.on_callback_query(filters.regex(r"^(help|about)$"))
+@app.on_callback_query(filters.regex(r"^(help|about)$"))
 async def help_about_callback(client: Client, query: CallbackQuery):
     if query.data == "help":
         text = """
