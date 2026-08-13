@@ -5,7 +5,7 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ChatType, MessageMediaType
-
+from bot import app
 from database import is_admin, get_user_targets, get_target, ensure_user
 from core.forwarder import forward_messages
 from handlers.keyboards import targets_list_keyboard
@@ -55,7 +55,7 @@ def build_target_selector_keyboard(targets: list, source_chat_id, last_msg_id: i
 # 1. Detect Source (Link or Forwarded Message)
 # ============================================================
 
-@Client.on_message(
+@app.on_message(
     filters.private
     & filters.incoming
     & (
@@ -146,7 +146,7 @@ async def source_detector(client: Client, message: Message):
 # 2. Target Selection Callbacks
 # ============================================================
 
-@Client.on_callback_query(filters.regex(r"^fwd:"))
+@app.on_callback_query(filters.regex(r"^fwd:"))
 async def forward_callbacks(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
 
@@ -278,7 +278,7 @@ async def forward_callbacks(client: Client, query: CallbackQuery):
 # 3. Cancel Command / Message
 # ============================================================
 
-@Client.on_message(filters.private & filters.regex(r"(?i)^cancel$"))
+@app.on_message(filters.private & filters.regex(r"(?i)^cancel$"))
 async def cancel_forward(client: Client, message: Message):
     user_id = message.from_user.id
 
