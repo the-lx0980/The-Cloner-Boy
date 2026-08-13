@@ -3,7 +3,7 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ParseMode
-from bot import app
+
 from database import (
     is_admin, get_target, update_target_settings, get_setting
 )
@@ -15,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@app.on_callback_query(filters.regex(r"^st:"))
+@Client.on_callback_query(filters.regex(r"^st:"))
 async def settings_callbacks(client: Client, query: CallbackQuery):
     user_id = query.from_user.id
     if not is_admin(user_id):
