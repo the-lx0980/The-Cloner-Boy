@@ -1,11 +1,6 @@
-from pathlib import Path
+# handlers/__init__.py
 
-def list_modules():
-    mod_dir = Path(__file__).parent
-    return [
-        file.stem
-        for file in mod_dir.glob("*.py")
-        if file.is_file() and file.name != "__init__.py"
-    ]
-
-ALL_MODULES = frozenset(sorted(list_modules()))
+from .target_handlers import *
+from .settings_handlers import *
+from .text_input_handlers import *
+from .source_handler import *
