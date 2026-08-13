@@ -2,14 +2,14 @@
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, AsyncGenerator, Union
 from pyrogram import Client
 from pyrogram.types import Message
-from pyrogram.errors import FloodWait, RPCError
+from pyrogram.errors import FloodWait
 from pyrogram.enums import ParseMode
 
 from database import get_setting
-from core.filters import should_process_message, get_unique_file_id
+from core.filters import should_process_message
 from core.caption import process_caption, build_inline_keyboard
 from core.anti_duplicate import check_and_mark_duplicate
 
@@ -27,6 +27,41 @@ class ForwardStats:
         self.errors = 0
 
 
+async def custom_iter_messages(
+    client: Client,
+    chat_id: Union[int, str],
+    limit: int,
+    offset: int = 0
+) -> AsyncGenerator[Message, None]:
+    """
+    Custom iter_messages that works with message IDs.
+    limit  = last message ID
+    offset = first message ID (skip before this)
+    """
+    current = offset
+    while True:
+        new_diff = min(200, limit - current)
+        if new_diff <= 0:
+            return
+
+        message_ids = list(range(current + 1, current + new_diff + 1))
+        try:
+            messages = await client.get_messages(chat_id, message_ids)
+        except Exception as e:
+            logger.error(f"Error getting messages: {e}")
+            return
+
+        if not isinstance(messages, list):
+            messages = [messages]
+
+        for message in messages:
+            if message is None or getattr(message, "empty", False):
+                current += 1
+                continue
+            yield message
+            current += 1
+
+
 async def forward_messages(
     client: Client,
     user_id: int,
@@ -37,20 +72,6 @@ async def forward_messages(
     progress_message: Optional[Message] = None,
     cancel_flag: Optional[Dict] = None
 ):
-    """
-    Main forwarding engine.
-
-    Parameters:
-        client            : Pyrogram/Kurigram client
-        user_id           : Who started the process
-        source_chat_id    : Source channel/group
-        target            : Full target document from MongoDB
-        last_msg_id       : Last message ID (start from here going backwards)
-        skip              : How many messages to skip from the end
-        progress_message  : Message to edit for progress
-        cancel_flag       : Dict like {user_id: False}  → set True to cancel
-    """
-
     settings = target.get("settings", {})
     target_chat_id = target["chat_id"]
     delay = float(settings.get("delay", 1.0))
@@ -58,41 +79,35 @@ async def forward_messages(
     anti_dup = settings.get("anti_duplicate", True)
 
     stats = ForwardStats()
-    stats.total = last_msg_id
+    stats.total = last_msg_id - skip
 
-    current = skip
     CANCEL = cancel_flag if cancel_flag is not None else {}
 
     try:
-        async for message in client.iter_messages(
+        async for message in custom_iter_messages(
+            client,
             source_chat_id,
-            offset_id=last_msg_id + 1,   # start from latest
-            reverse=True                 # go from old → new? Adjust as needed
+            limit=last_msg_id,
+            offset=skip
         ):
-            # Safety: stop when we reach skip point
-            if message.id <= skip:
-                break
-
             if CANCEL.get(user_id):
                 if progress_message:
                     await progress_message.edit_text(
                         f"**🛑 Forwarding Cancelled**\n\n"
-                        f"Completed: `{current}` / `{stats.total}`\n"
+                        f"Fetched: `{stats.fetched}`\n"
                         f"Forwarded: `{stats.forwarded}`"
                     )
                 return stats
 
-            current = message.id
             stats.fetched += 1
 
-            # -------- Progress Update (every 20 messages) --------
+            # Progress every 20 messages
             if progress_message and stats.fetched % 20 == 0:
                 try:
                     await progress_message.edit_text(
                         f"**🚀 Forwarding in progress...**\n\n"
-                        f"Source → Target\n"
                         f"`{source_chat_id}` → `{target_chat_id}`\n\n"
-                        f"**Progress:** `{stats.fetched}` fetched\n"
+                        f"**Fetched:** `{stats.fetched}`\n"
                         f"**Forwarded:** `{stats.forwarded}`\n"
                         f"**Skipped (filter):** `{stats.skipped_filter}`\n"
                         f"**Skipped (duplicate):** `{stats.skipped_duplicate}`\n"
@@ -102,7 +117,7 @@ async def forward_messages(
                 except Exception:
                     pass
 
-            # -------- Filters --------
+            # Filters
             should, reason = should_process_message(message, settings)
             if not should:
                 if reason == "deleted":
@@ -111,7 +126,7 @@ async def forward_messages(
                     stats.skipped_filter += 1
                 continue
 
-            # -------- Anti-Duplicate --------
+            # Anti-Duplicate
             is_dup = check_and_mark_duplicate(
                 user_id=user_id,
                 target_chat_id=target_chat_id,
@@ -122,21 +137,19 @@ async def forward_messages(
                 stats.skipped_duplicate += 1
                 continue
 
-            # -------- Process Caption --------
+            # Caption + Buttons
             final_caption = process_caption(message, settings)
             reply_markup = build_inline_keyboard(settings)
 
-            # -------- Send --------
+            # Send
             try:
                 if forward_tag:
-                    # Keep original forward tag
                     await client.forward_messages(
                         chat_id=target_chat_id,
                         from_chat_id=source_chat_id,
                         message_ids=message.id
                     )
                 else:
-                    # Clean copy / send
                     if message.media:
                         media = getattr(message, message.media.value, None)
                         if media and hasattr(media, "file_id"):
@@ -148,7 +161,6 @@ async def forward_messages(
                                 reply_markup=reply_markup
                             )
                         else:
-                            # Fallback
                             await client.copy_message(
                                 chat_id=target_chat_id,
                                 from_chat_id=source_chat_id,
@@ -158,10 +170,9 @@ async def forward_messages(
                                 reply_markup=reply_markup
                             )
                     else:
-                        # Pure text
                         await client.send_message(
                             chat_id=target_chat_id,
-                            text=final_caption or message.text,
+                            text=final_caption or message.text or "",
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup,
                             disable_web_page_preview=True
@@ -172,7 +183,6 @@ async def forward_messages(
             except FloodWait as e:
                 logger.warning(f"FloodWait: sleeping {e.value}s")
                 await asyncio.sleep(e.value)
-                # Retry once
                 try:
                     if message.media:
                         media = getattr(message, message.media.value, None)
@@ -187,7 +197,7 @@ async def forward_messages(
                     else:
                         await client.send_message(
                             chat_id=target_chat_id,
-                            text=final_caption or message.text,
+                            text=final_caption or message.text or "",
                             parse_mode=ParseMode.HTML,
                             reply_markup=reply_markup
                         )
@@ -201,7 +211,6 @@ async def forward_messages(
                 stats.errors += 1
                 continue
 
-            # -------- Delay --------
             if delay > 0:
                 await asyncio.sleep(delay)
 
@@ -214,7 +223,7 @@ async def forward_messages(
             )
         raise
 
-    # -------- Final Report --------
+    # Final Report
     if progress_message:
         await progress_message.edit_text(
             f"**✅ Forwarding Completed!**\n\n"
