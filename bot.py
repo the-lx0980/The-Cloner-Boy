@@ -1,122 +1,187 @@
-import os
-import sys
+# bot.py
+# Compatible with kurigram 2.2.24 + Python 3.14 + Render
 
-# Automatic root directory setup to fix 'No module named' errors
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-import asyncio
-import importlib
 import logging
-import time
-from typing import AsyncGenerator, Optional, Union
+from pyrogram import Client, filters, idle
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.enums import ParseMode
 
-from botlogger import LOGGER
-from config import Config as config
-from database import db
-from handlers import ALL_MODULES  # Loaded correctly from handlers
-from pyrogram import Client, idle, types
+from config import Config
+from database import db, ensure_user, is_admin, get_user_targets
 
-# ==================== LOGGING SETUP ====================
+# Import all handlers
+from handlers import target_handlers
+from handlers import settings_handlers
+from handlers import text_input_handlers
+from handlers import source_handler
+
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
-# Reduce noise from third-party libraries
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("pymongo").setLevel(logging.WARNING)
 
-# Uptime tracking
-START_TIME = time.time()
+
+# ==================== CLIENT ====================
+
+app = Client(
+    name="ForwardBot",
+    api_id=Config.API_ID,
+    api_hash=Config.API_HASH,
+    bot_token=Config.BOT_TOKEN,
+    parse_mode=ParseMode.HTML,
+    in_memory=True
+)
 
 
-# ==================== BOT CLASS DEFINITION ====================
-class Bot(Client):
-    """Custom Pyrogram Client with extended helper methods."""
+# ==================== HANDLERS ====================
 
-    def __init__(self):
-        super().__init__(
-            name="ForwardBot",
-            api_id=config.API_ID,
-            api_hash=config.API_HASH,
-            bot_token=config.BOT_TOKEN,
-            max_concurrent_transmissions=7,
+@app.on_message(filters.private & filters.command("start"))
+async def start_handler(client: Client, message: Message):
+    user = message.from_user
+    user_id = user.id
+
+    ensure_user(user_id)
+
+    if not is_admin(user_id):
+        return await message.reply(
+            "❌ **Access Denied**\n\nYou are not authorized to use this bot."
         )
-        self.id: Optional[int] = None
-        self.name: Optional[str] = None
-        self.username: Optional[str] = None
 
-    async def start(self, *args, **kwargs):
-        """Starts the bot client and initializes database connection."""
-        await super().start(*args, **kwargs)
-        me = await self.get_me()
-        self.id = me.id
-        self.name = me.first_name
-        self.username = me.username
+    targets = get_user_targets(user_id)
 
-        try:
-            db.connect()
-            logger.info("✅ MongoDB connected successfully")
-        except Exception as e:
-            logger.error(f"❌ MongoDB connection failed: {e}")
-            raise
+    text = f"""
+**👋 Welcome {user.first_name}!**
 
-    async def stop(self, *args, **kwargs):
-        """Safely stops the bot client."""
-        await super().stop(*args, **kwargs)
+This is an advanced **Multi-Target Forward Bot**.
 
-    async def iter_messages(
-        self, chat_id: Union[int, str], limit: int, offset: int = 0
-    ) -> Optional[AsyncGenerator["types.Message", None]]:
-        """Iterate through a chat sequentially.
+**📊 Your Stats**
+├ Targets: `{len(targets)}`
+└ Status: `Admin`
 
-        Fetches messages in chunks to save boilerplate code.
-        """
-        current = offset
-        while True:
-            new_diff = min(200, limit - current)
-            if new_diff <= 0:
-                return
+**🛠 Commands**
+/targets — Manage targets
+/addtarget — Add new target
+/start — This message
 
-            messages = await self.get_messages(
-                chat_id, list(range(current, current + new_diff + 1))
-            )
-            for message in messages:
-                yield message
-                current += 1
+**How to use**
+1. Add targets via /targets
+2. Configure settings for each target
+3. Send source link or forward a message
+4. Select target → Forwarding starts
+"""
+
+    buttons = [
+        [
+            InlineKeyboardButton("🎯 My Targets", callback_data="tg:list"),
+            InlineKeyboardButton("➕ Add Target", callback_data="tg:add")
+        ],
+        [
+            InlineKeyboardButton("📖 Help", callback_data="help"),
+            InlineKeyboardButton("ℹ️ About", callback_data="about")
+        ]
+    ]
+
+    await message.reply(text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
 
 
-# Initialize the bot client instance
-app = Bot()
+@app.on_callback_query(filters.regex(r"^(help|about)$"))
+async def help_about_callback(client: Client, query):
+    if query.data == "help":
+        text = """
+**📖 Help**
+
+• /targets → Manage & configure targets
+• Send source link or forward message
+• Select target to start forwarding
+• Send `cancel` to stop ongoing process
+"""
+    else:
+        text = """
+**ℹ️ About**
+
+Multi-Target Forward Bot
+• kurigram 2.2.24
+• Per-target settings
+• Anti-duplicate system
+"""
+
+    await query.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("« Back", callback_data="back_to_start")]
+        ])
+    )
+    await query.answer()
 
 
-# ==================== BOOT & STARTUP LOGIC ====================
-async def boot():
-    """Bootstraps, loads handlers, and runs the Telegram bot."""
-    LOGGER(__name__).info("Bot is starting...")
-    await app.start()
-    LOGGER(__name__).info("Bot started successfully.")
+@app.on_callback_query(filters.regex(r"^back_to_start$"))
+async def back_to_start(client: Client, query):
+    user = query.from_user
+    user_id = user.id
 
-    # Dynamically load all handlers after app has started
-    for module in ALL_MODULES:
-        try:
-            # FIXED: Changed from 'modules.' to 'handlers.'
-            importlib.import_module(f"handlers.{module}")
-            LOGGER(__name__).info(f"Successfully loaded handler: {module}")
-        except Exception as e:
-            LOGGER(__name__).error(f"Failed to load handler {module}: {e}")
+    ensure_user(user_id)
 
-    try:
-        await idle()
-    finally:
-        LOGGER(__name__).warning("Bot is shutting down...")
-        await app.stop()
+    if not is_admin(user_id):
+        return await query.answer("❌ You are not authorized.", show_alert=True)
 
+    targets = get_user_targets(user_id)
+
+    text = f"""
+**👋 Welcome {user.first_name}!**
+
+This is an advanced **Multi-Target Forward Bot**.
+
+**📊 Your Stats**
+├ Targets: `{len(targets)}`
+└ Status: `Admin`
+
+**🛠 Commands**
+/targets — Manage targets
+/addtarget — Add new target
+/start — This message
+
+**How to use**
+1. Add targets via /targets
+2. Configure settings for each target
+3. Send source link or forward a message
+4. Select target → Forwarding starts
+"""
+
+    buttons = [
+        [
+            InlineKeyboardButton("🎯 My Targets", callback_data="tg:list"),
+            InlineKeyboardButton("➕ Add Target", callback_data="tg:add")
+        ],
+        [
+            InlineKeyboardButton("📖 Help", callback_data="help"),
+            InlineKeyboardButton("ℹ️ About", callback_data="about")
+        ]
+    ]
+
+    await query.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(buttons),
+        disable_web_page_preview=True
+    )
+    await query.answer()
+
+
+# ==================== STARTUP ====================
 
 if __name__ == "__main__":
+    logger.info("Connecting to MongoDB...")
     try:
-        asyncio.get_event_loop().run_until_complete(boot())
-    except KeyboardInterrupt:
-        LOGGER(__name__).warning("Bot interrupted by user or system.")
+        db.connect()
+        logger.info("✅ MongoDB connected successfully")
+    except Exception as e:
+        logger.error(f"❌ MongoDB connection failed: {e}")
+        raise
+
+    logger.info("Starting bot with kurigram 2.2.24...")
+    app.run()   # ← YEH SAHI TARIKA HAI (no argument)
