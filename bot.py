@@ -1,21 +1,21 @@
 # bot.py
-# Compatible with kurigram 2.2.24 + Python 3.14 + Render
 
 import logging
-from pyrogram import Client, filters, idle
+from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
 
 from config import Config
 from database import db, ensure_user, is_admin, get_user_targets
 
-# Import all handlers
-from handlers import target_handlers
-from handlers import settings_handlers
-from handlers import text_input_handlers
-from handlers import source_handler
+# ==================== IMPORTANT: Load all handlers ====================
+# Yeh lines zaroori hain taaki decorators register ho jayein
+import handlers.target_handlers
+import handlers.settings_handlers
+import handlers.text_input_handlers
+import handlers.source_handler
+# =====================================================================
 
-# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - [%(levelname)s] - %(name)s - %(message)s",
@@ -27,8 +27,6 @@ logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 
-# ==================== CLIENT ====================
-
 app = Client(
     name="ForwardBot",
     api_id=Config.API_ID,
@@ -39,7 +37,7 @@ app = Client(
 )
 
 
-# ==================== HANDLERS ====================
+# ==================== START HANDLERS (already working) ====================
 
 @app.on_message(filters.private & filters.command("start"))
 async def start_handler(client: Client, message: Message):
@@ -184,4 +182,4 @@ if __name__ == "__main__":
         raise
 
     logger.info("Starting bot with kurigram 2.2.24...")
-    app.run()   # ← YEH SAHI TARIKA HAI (no argument)
+    app.run()
