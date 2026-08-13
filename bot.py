@@ -41,17 +41,15 @@ app = Client(
 
 # ==================== HANDLERS ====================
 
-@app.on_message(filters.private & filters.command("start"))
-async def start_handler(client: Client, message: Message):
-    user = message.from_user
+async def send_start_menu(client, user, message_or_query):
     user_id = user.id
-
     ensure_user(user_id)
 
     if not is_admin(user_id):
-        return await message.reply(
-            "❌ **Access Denied**\n\nYou are not authorized to use this bot."
-        )
+        if hasattr(message_or_query, "answer"):  # CallbackQuery
+            return await message_or_query.answer("❌ Not authorized", show_alert=True)
+        else:
+            return await message_or_query.reply("❌ **Access Denied**")
 
     targets = get_user_targets(user_id)
 
@@ -68,15 +66,9 @@ This is an advanced **Multi-Target Forward Bot**.
 /targets — Manage targets
 /addtarget — Add new target
 /start — This message
-
-**How to use**
-1. Add targets via /targets
-2. Configure settings for each target
-3. Send source link or forward a message
-4. Select target → Forwarding starts
 """
 
-    buttons = [
+    buttons = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🎯 My Targets", callback_data="tg:list"),
             InlineKeyboardButton("➕ Add Target", callback_data="tg:add")
@@ -85,46 +77,23 @@ This is an advanced **Multi-Target Forward Bot**.
             InlineKeyboardButton("📖 Help", callback_data="help"),
             InlineKeyboardButton("ℹ️ About", callback_data="about")
         ]
-    ]
+    ])
 
-    await message.reply(text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+    if hasattr(message_or_query, "edit_text"):  # CallbackQuery
+        await message_or_query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
+        await message_or_query.answer()
+    else:  # Message
+        await message_or_query.reply(text, reply_markup=buttons, disable_web_page_preview=True)
 
 
-@app.on_callback_query(filters.regex(r"^(help|about)$"))
-async def help_about_callback(client: Client, query):
-    if query.data == "help":
-        text = """
-**📖 Help**
-
-• /targets → Manage & configure targets
-• Send source link or forward message
-• Select target to start forwarding
-• Send `cancel` to stop ongoing process
-"""
-    else:
-        text = """
-**ℹ️ About**
-
-Multi-Target Forward Bot
-• kurigram 2.2.24
-• Per-target settings
-• Anti-duplicate system
-"""
-
-    await query.message.edit_text(
-        text,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("« Back", callback_data="back_to_start")]
-        ])
-    )
-    await query.answer()
+@app.on_message(filters.private & filters.command("start"))
+async def start_handler(client: Client, message: Message):
+    await send_start_menu(client, message.from_user, message)
 
 
 @app.on_callback_query(filters.regex(r"^back_to_start$"))
 async def back_to_start(client: Client, query):
-    # Reuse start logic
-    await start_handler(client, query.message)
-    await query.answer()
+    await send_start_menu(client, query.from_user, query)
 
 
 # ==================== STARTUP ====================
