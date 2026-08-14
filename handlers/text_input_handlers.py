@@ -272,31 +272,56 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 4. ADD FORWARD BOT
+    # 4. ADD FORWARD BOT (Improved with Validation)
     # ============================================================
     bot_add_state = getattr(client, "bot_add_state", {}).get(user_id)
     if bot_add_state:
         token = text.strip()
-        if ":" not in token or len(token) < 30:
-            return await message.reply("❌ Invalid bot token format.")
+
+        # Basic format check
+        if ":" not in token or len(token) < 40:
+            return await message.reply(
+                "❌ Invalid bot token format.\n\n"
+                "Token looks like this:\n"
+                "`123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw`"
+            )
 
         try:
-            # Optional: validate token by creating a temporary client (advanced)
+            # Real validation: temporary client se check karo
+            temp_bot = Client(
+                name=f"validate_bot_{user_id}",
+                api_id=Config.API_ID,
+                api_hash=Config.API_HASH,
+                bot_token=token,
+                in_memory=True
+            )
+
+            await temp_bot.connect()
+            me = await temp_bot.get_me()
+            await temp_bot.disconnect()
+
+            bot_username = me.username
+            bot_name = me.first_name or f"Bot {token[:8]}"
+
+            # Save to database
             result = add_forward_bot(
                 user_id=user_id,
                 bot_token=token,
-                bot_username=None,
-                name=f"Bot {token[:8]}"
+                bot_username=bot_username,
+                name=bot_name
             )
+
             client.bot_add_state[user_id] = False
 
             if result is None:
                 return await message.reply("⚠️ This bot token is already added.")
 
             await message.reply(
-                f"✅ **Forward Bot Added!**\n\n"
-                f"**Name:** {result.get('name')}\n"
-                f"**Bot ID:** `{result.get('bot_id')}`"
+                f"✅ **Forward Bot Added Successfully!**\n\n"
+                f"**Name:** {bot_name}\n"
+                f"**Username:** @{bot_username}\n"
+                f"**Bot ID:** `{result.get('bot_id')}`\n\n"
+                f"Ab aap is bot ko Jobs mein use kar sakte ho."
             )
 
             bots = get_user_bots(user_id)
@@ -304,8 +329,21 @@ async def handle_all_text_input(client: Client, message: Message):
                 f"**🤖 Forward Bots** ({len(bots)})",
                 reply_markup=bots_list_keyboard(bots)
             )
+
         except Exception as e:
-            await message.reply(f"❌ Error adding bot: `{e}`")
+            error_msg = str(e).lower()
+
+            if "token" in error_msg or "unauthorized" in error_msg:
+                await message.reply("❌ Invalid Bot Token. Please check and try again.")
+            elif "flood" in error_msg:
+                await message.reply("⏳ FloodWait! Thodi der baad try karein.")
+            else:
+                logger.exception(e)
+                await message.reply(f"❌ Error adding bot:\n`{e}`")
+
+            # State clear mat karo taaki user dubara try kar sake
+            # client.bot_add_state[user_id] = False   ← optional
+
         return
 
     # ============================================================
