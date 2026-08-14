@@ -2,6 +2,10 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, CallbackQuery
 from pyrogram.enums import ParseMode
+from pyrogram.errors import (
+    PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordNeeded,
+    PhoneNumberInvalid, FloodWait
+)
 
 from database import (
     is_admin, ensure_user,
@@ -52,13 +56,12 @@ async def accounts_callbacks(client: Client, query: CallbackQuery):
         await show_accounts_list(client, query)
         return
 
-    # -------------------- Add Account --------------------
+    # -------------------- Add Account (Start Login Flow) --------------------
     if data == "acc:add":
         await query.message.edit_text(
             "**➕ Add New Account**\n\n"
             "Send the **phone number** in international format.\n\n"
             "Example: `+919876543210`\n\n"
-            "After that you will receive a login code.\n"
             "Type /cancel to cancel."
         )
         client.account_add_state = getattr(client, "account_add_state", {})
@@ -190,3 +193,278 @@ async def accounts_callbacks(client: Client, query: CallbackQuery):
         else:
             await query.answer("Failed to delete", show_alert=True)
         return
+
+
+# -------------------- Phone Number Input Handler --------------------
+@Client.on_message(filters.private & filters.text)
+async def account_add_phone_handler(client: Client, message: Message):
+    """Handle phone number input for adding new account"""
+    user_id = message.from_user.id
+    
+    # Check if user is in phone input state
+    account_add_state = getattr(client, "account_add_state", {})
+    if user_id not in account_add_state:
+        return
+    
+    state = account_add_state[user_id]
+    if state.get("step") != "phone":
+        return
+    
+    # Cancel command
+    if message.text.startswith("/cancel"):
+        del account_add_state[user_id]
+        await message.reply_text("❌ Cancelled account addition.")
+        return
+    
+    phone = message.text.strip()
+    
+    # Validate phone format
+    if not phone.startswith("+") or not phone[1:].isdigit():
+        await message.reply_text(
+            "❌ Invalid phone number format.\n\n"
+            "Please send phone number in international format.\n"
+            "Example: `+919876543210`\n\n"
+            "Type /cancel to cancel."
+        )
+        return
+    
+    try:
+        # Try to send login code
+        sent_code = await client.send_code(phone)
+        
+        # Store session data
+        client.account_add_state[user_id] = {
+            "step": "code",
+            "phone": phone,
+            "phone_code_hash": sent_code.phone_code_hash
+        }
+        
+        await message.reply_text(
+            "**📱 Verification Code Sent**\n\n"
+            f"A login code has been sent to `{phone}`.\n\n"
+            "Please send the code you received (numbers only).\n\n"
+            "Example: `12345`\n\n"
+            "Type /cancel to cancel."
+        )
+        
+    except PhoneNumberInvalid:
+        await message.reply_text(
+            "❌ Invalid phone number.\n\n"
+            "Please send a valid phone number in international format.\n"
+            "Example: `+919876543210`\n\n"
+            "Type /cancel to cancel."
+        )
+    except FloodWait as e:
+        wait_time = e.value
+        await message.reply_text(
+            f"⏳ **Rate Limited**\n\n"
+            f"Please wait **{wait_time} seconds** before trying again."
+        )
+    except Exception as e:
+        logger.error(f"Error sending verification code: {e}")
+        await message.reply_text(
+            "❌ Failed to send verification code.\n\n"
+            "Please try again later."
+        )
+
+
+# -------------------- Code Verification Handler --------------------
+@Client.on_message(filters.private & filters.text)
+async def account_add_code_handler(client: Client, message: Message):
+    """Handle verification code input for adding new account"""
+    user_id = message.from_user.id
+    
+    # Check if user is in code input state
+    account_add_state = getattr(client, "account_add_state", {})
+    if user_id not in account_add_state:
+        return
+    
+    state = account_add_state[user_id]
+    if state.get("step") != "code":
+        return
+    
+    # Cancel command
+    if message.text.startswith("/cancel"):
+        del account_add_state[user_id]
+        await message.reply_text("❌ Cancelled account addition.")
+        return
+    
+    code = message.text.strip()
+    
+    # Validate code format (only numbers)
+    if not code.isdigit():
+        await message.reply_text(
+            "❌ Invalid code format.\n\n"
+            "Please send only the numeric code you received.\n"
+            "Example: `12345`\n\n"
+            "Type /cancel to cancel."
+        )
+        return
+    
+    try:
+        phone = state.get("phone")
+        phone_code_hash = state.get("phone_code_hash")
+        
+        # Try to sign in with the code
+        try:
+            await client.sign_in(phone, phone_code_hash, code)
+        except SessionPasswordNeeded:
+            # 2FA is enabled
+            client.account_add_state[user_id] = {
+                "step": "password",
+                "phone": phone,
+                "phone_code_hash": phone_code_hash
+            }
+            await message.reply_text(
+                "**🔐 Two-Factor Authentication Required**\n\n"
+                "This account has 2FA enabled.\n"
+                "Please send your 2FA password.\n\n"
+                "Type /cancel to cancel."
+            )
+            return
+        
+        # Successfully logged in
+        # Get account info
+        me = await client.get_me()
+        account_id = f"acc_{user_id}_{me.id}"
+        
+        # Store account in database
+        account_data = {
+            "id": account_id,
+            "user_id": user_id,
+            "phone": phone,
+            "name": me.first_name or "Unknown",
+            "username": me.username,
+            "status": "active",
+            "forward_limit": 500,
+            "sleep_after_limit_minutes": 30,
+            "forwarded_count": 0,
+            "total_forwarded": 0
+        }
+        
+        add_forward_account(user_id, account_data)
+        
+        # Clean up state
+        del account_add_state[user_id]
+        
+        await message.reply_text(
+            f"**✅ Account Added Successfully!**\n\n"
+            f"**Name:** {me.first_name or 'Unknown'}\n"
+            f"**Phone:** `{phone}`\n"
+            f"**Username:** @{me.username if me.username else 'N/A'}\n\n"
+            f"The account has been added and is ready to use.\n"
+            f"You can adjust settings using the account menu."
+        )
+        
+        # Show accounts list
+        # Note: We can't use query here, so we'll send a new message with the list
+        accounts = get_user_accounts(user_id)
+        await message.reply_text(
+            f"**👤 My Accounts** ({len(accounts)})\n\nSelect an account to manage:",
+            reply_markup=accounts_list_keyboard(accounts)
+        )
+        
+    except PhoneCodeInvalid:
+        await message.reply_text(
+            "❌ Invalid verification code.\n\n"
+            "Please check the code and try again.\n"
+            "Type /cancel to cancel."
+        )
+    except PhoneCodeExpired:
+        await message.reply_text(
+            "❌ Verification code expired.\n\n"
+            "Please start the process again by clicking **Add Account**."
+        )
+        del account_add_state[user_id]
+    except FloodWait as e:
+        wait_time = e.value
+        await message.reply_text(
+            f"⏳ **Rate Limited**\n\n"
+            f"Please wait **{wait_time} seconds** before trying again."
+        )
+    except Exception as e:
+        logger.error(f"Error verifying code: {e}")
+        await message.reply_text(
+            "❌ Failed to verify code.\n\n"
+            "Please try again later."
+        )
+        # Clean up state on error
+        if user_id in account_add_state:
+            del account_add_state[user_id]
+
+
+# -------------------- Password Handler (for 2FA) --------------------
+@Client.on_message(filters.private & filters.text)
+async def account_add_password_handler(client: Client, message: Message):
+    """Handle 2FA password input for adding new account"""
+    user_id = message.from_user.id
+    
+    # Check if user is in password input state
+    account_add_state = getattr(client, "account_add_state", {})
+    if user_id not in account_add_state:
+        return
+    
+    state = account_add_state[user_id]
+    if state.get("step") != "password":
+        return
+    
+    # Cancel command
+    if message.text.startswith("/cancel"):
+        del account_add_state[user_id]
+        await message.reply_text("❌ Cancelled account addition.")
+        return
+    
+    password = message.text.strip()
+    
+    try:
+        phone = state.get("phone")
+        phone_code_hash = state.get("phone_code_hash")
+        
+        # Try to sign in with password
+        await client.sign_in(phone, phone_code_hash, password)
+        
+        # Successfully logged in
+        me = await client.get_me()
+        account_id = f"acc_{user_id}_{me.id}"
+        
+        # Store account in database
+        account_data = {
+            "id": account_id,
+            "user_id": user_id,
+            "phone": phone,
+            "name": me.first_name or "Unknown",
+            "username": me.username,
+            "status": "active",
+            "forward_limit": 500,
+            "sleep_after_limit_minutes": 30,
+            "forwarded_count": 0,
+            "total_forwarded": 0
+        }
+        
+        add_forward_account(user_id, account_data)
+        
+        # Clean up state
+        del account_add_state[user_id]
+        
+        await message.reply_text(
+            f"**✅ Account Added Successfully!**\n\n"
+            f"**Name:** {me.first_name or 'Unknown'}\n"
+            f"**Phone:** `{phone}`\n"
+            f"**Username:** @{me.username if me.username else 'N/A'}\n\n"
+            f"The account has been added and is ready to use.\n"
+            f"You can adjust settings using the account menu."
+        )
+        
+        # Show accounts list
+        accounts = get_user_accounts(user_id)
+        await message.reply_text(
+            f"**👤 My Accounts** ({len(accounts)})\n\nSelect an account to manage:",
+            reply_markup=accounts_list_keyboard(accounts)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error verifying password: {e}")
+        await message.reply_text(
+            "❌ Invalid password.\n\n"
+            "Please try again or type /cancel to cancel."
+        )
