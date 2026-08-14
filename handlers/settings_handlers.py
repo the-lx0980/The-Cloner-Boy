@@ -1,7 +1,6 @@
 # handlers/settings_handlers.py
-
 from pyrogram import Client, filters
-from pyrogram.types import Message, CallbackQuery
+from pyrogram.types import CallbackQuery
 from pyrogram.enums import ParseMode
 
 from database import (
@@ -38,7 +37,6 @@ async def settings_callbacks(client: Client, query: CallbackQuery):
 
         update_target_settings(user_id, chat_id, {key: new_value})
 
-        # Refresh target
         target = get_target(user_id, chat_id)
         title = target.get("title", "Unknown")
 
@@ -81,7 +79,6 @@ async def settings_callbacks(client: Client, query: CallbackQuery):
                 f"Type /cancel to go back."
             )
             await query.message.edit_text(text, reply_markup=simple_back_keyboard(chat_id))
-            # simple state
             client.settings_state = getattr(client, "settings_state", {})
             client.settings_state[user_id] = {"action": "set_delay", "chat_id": chat_id}
             return await query.answer()
@@ -181,7 +178,7 @@ async def settings_callbacks(client: Client, query: CallbackQuery):
         await query.answer("Unknown menu", show_alert=True)
         return
 
-    # st:media:CHAT_ID:MEDIA_KEY  (toggle media type)
+    # st:media:CHAT_ID:MEDIA_KEY
     if parts[1] == "media":
         chat_id = int(parts[2])
         media_key = parts[3]
@@ -198,7 +195,6 @@ async def settings_callbacks(client: Client, query: CallbackQuery):
 
         update_target_settings(user_id, chat_id, {"media_types": current_list})
 
-        # refresh
         target = get_target(user_id, chat_id)
         text = (
             f"**🎞 Media Types Filter**\n\n"
