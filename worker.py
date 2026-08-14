@@ -232,49 +232,61 @@ async def run_job(job: dict):
 
 # ==================== MAIN LOOP ====================
 
+# worker.py → worker_loop
+
 async def worker_loop():
-    logger.info("Worker loop started. Polling for RUNNING jobs...")
+    logger.info("Worker loop started")
 
     while RUNNING:
         try:
             # 1. Wake sleeping accounts
             woken = wake_sleeping_accounts()
             if woken > 0:
-                logger.info(f"Woke up {woken} sleeping account(s)")
+                logger.info(f"Woke up {woken} account(s)")
 
-            # 2. Get all active jobs
+            # 2. Auto-resume PAUSED jobs if accounts are now available
+            from database import get_user_jobs, JobStatus
+            paused_jobs = []
+            # You can make a helper get_paused_jobs() later
+            all_jobs = get_active_jobs()  # currently only RUNNING + PENDING
+            # Better: create get_jobs_by_status
+
+            # For now simple version:
+            from database import db
+            paused = list(db.forward_jobs.find({"status": JobStatus.PAUSED.value}))
+            
+            for job in paused:
+                user_id = job["user_id"]
+                account_ids = job.get("account_ids", [])
+                
+                if job.get("method") == "user" and account_ids:
+                    available = get_next_available_account(user_id, account_ids)
+                    if available:
+                        logger.info(f"Resuming paused job {job['job_id']} (accounts available)")
+                        set_job_status(user_id, job["job_id"], JobStatus.RUNNING.value)
+
+            # 3. Normal running jobs processing (same as before)
             jobs = get_active_jobs()
             running_jobs = [j for j in jobs if j.get("status") == JobStatus.RUNNING.value]
 
             for job in running_jobs:
                 job_id = job["job_id"]
-
-                # Already running?
                 if job_id in CURRENT_TASKS and not CURRENT_TASKS[job_id].done():
                     continue
 
-                # Spawn new task
                 task = asyncio.create_task(run_job(job))
                 CURRENT_TASKS[job_id] = task
-                logger.info(f"Spawned task for job {job_id}")
 
-            # 3. Cleanup finished tasks
+            # Cleanup finished
             finished = [jid for jid, t in CURRENT_TASKS.items() if t.done()]
             for jid in finished:
                 del CURRENT_TASKS[jid]
 
-            await asyncio.sleep(7)  # Poll interval
+            await asyncio.sleep(8)
 
         except Exception as e:
             logger.exception(f"Worker loop error: {e}")
             await asyncio.sleep(15)
-
-    # Graceful shutdown
-    logger.info("Shutting down worker...")
-    for task in CURRENT_TASKS.values():
-        task.cancel()
-    await close_all_clients()
-    logger.info("Worker stopped cleanly")
 
 
 # ==================== ENTRY POINT ====================
