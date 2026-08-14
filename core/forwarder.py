@@ -1,24 +1,22 @@
 # core/forwarder.py
-# Improved Forwarding Engine - Phase 1
-# Compatible with worker.py + database.py
+# Final Phase-1 Engine with Account Rotation + Better Error Handling
 
 import asyncio
 import logging
-from typing import Dict, Any, Optional, AsyncGenerator, Union, List
+from typing import Dict, Any, Optional, AsyncGenerator, Union, List, Callable, Awaitable, Tuple
 
 from pyrogram import Client
 from pyrogram.types import Message
-from pyrogram.errors import FloodWait, SlowmodeWait
+from pyrogram.errors import (
+    FloodWait, SlowmodeWait, 
+    UserDeactivated, AuthKeyUnregistered, SessionRevoked
+)
 from pyrogram.enums import ParseMode
 
 from database import (
-    get_setting,
-    update_job_stats,
-    set_job_status,
-    increment_account_forwarded,
-    increment_stats,
-    get_next_available_account,
-    JobStatus,
+    update_job_stats, set_job_status,
+    increment_account_forwarded, increment_stats,
+    JobStatus, AccountStatus
 )
 from core.filters import should_process_message
 from core.caption import process_caption, build_inline_keyboard
@@ -43,11 +41,6 @@ async def custom_iter_messages(
     limit: int,
     offset: int = 0
 ) -> AsyncGenerator[Message, None]:
-    """
-    Efficient message iterator using message IDs.
-    limit  = last message ID
-    offset = start from this ID (skip)
-    """
     current = offset
     while True:
         batch_size = min(200, limit - current)
@@ -81,21 +74,15 @@ async def forward_messages(
     skip: int = 0,
     progress_message: Optional[Message] = None,
     cancel_flag: Optional[Dict] = None,
-    # ===== Worker parameters =====
     job_id: Optional[str] = None,
     account_id: Optional[str] = None,
     account_ids: Optional[List[str]] = None,
     strategy: str = "sequential",
+    # Callback for account rotation (provided by worker)
+    get_new_client_callback: Optional[
+        Callable[[int, List[str], str], Awaitable[Tuple[Optional[Client], Optional[str]]]]
+    ] = None,
 ):
-    """
-    Main forwarding engine.
-    Supports:
-    - Job tracking
-    - Account limit / sleep
-    - Anti-duplicate
-    - All target settings
-    - Resume from skip/current_msg_id
-    """
     settings = target.get("settings", {})
     target_chat_id = target["chat_id"]
     delay = float(settings.get("delay", 1.0))
@@ -103,71 +90,42 @@ async def forward_messages(
     anti_dup = settings.get("anti_duplicate", True)
 
     stats = ForwardStats()
-    CANCEL = cancel_flag if cancel_flag is not None else {}
+    CANCEL = cancel_flag or {}
 
+    current_client = client
     current_account_id = account_id
 
     try:
         async for message in custom_iter_messages(
-            client,
-            source_chat_id,
-            limit=last_msg_id,
-            offset=skip
+            current_client, source_chat_id, limit=last_msg_id, offset=skip
         ):
-            # ---------- Cancellation check ----------
+            # ----- Cancel / Job status check -----
             if CANCEL.get(user_id):
-                if progress_message:
-                    try:
-                        await progress_message.edit_text(
-                            f"**🛑 Forwarding Cancelled**\n\n"
-                            f"Fetched: `{stats.fetched}`\n"
-                            f"Forwarded: `{stats.forwarded}`"
-                        )
-                    except Exception:
-                        pass
                 if job_id:
                     set_job_status(user_id, job_id, JobStatus.CANCELLED.value)
                 return stats
 
-            # ---------- Job status check (important for worker) ----------
             if job_id:
                 from database import get_job
-                fresh_job = get_job(user_id, job_id)
-                if not fresh_job or fresh_job.get("status") != JobStatus.RUNNING.value:
-                    logger.info(f"Job {job_id} is no longer RUNNING. Stopping forwarder.")
+                fresh = get_job(user_id, job_id)
+                if not fresh or fresh.get("status") != JobStatus.RUNNING.value:
+                    logger.info(f"Job {job_id} stopped by user")
                     return stats
 
             stats.fetched += 1
 
-            # ---------- Progress update ----------
-            if progress_message and stats.fetched % 25 == 0:
-                try:
-                    await progress_message.edit_text(
-                        f"**🚀 Forwarding in progress...**\n\n"
-                        f"`{source_chat_id}` → `{target_chat_id}`\n\n"
-                        f"**Fetched:** `{stats.fetched}`\n"
-                        f"**Forwarded:** `{stats.forwarded}`\n"
-                        f"**Skipped (filter):** `{stats.skipped_filter}`\n"
-                        f"**Skipped (duplicate):** `{stats.skipped_duplicate}`\n"
-                        f"**Deleted:** `{stats.skipped_deleted}`\n\n"
-                        f"Send `cancel` to stop."
-                    )
-                except Exception:
-                    pass
-
-            # ---------- FILTERS ----------
+            # ----- Filters -----
             should, reason = should_process_message(message, settings)
             if not should:
                 if reason == "deleted":
                     stats.skipped_deleted += 1
                 else:
                     stats.skipped_filter += 1
-
                 if job_id:
                     update_job_stats(user_id, job_id, {"fetched": 1}, current_msg_id=message.id)
                 continue
 
-            # ---------- ANTI-DUPLICATE ----------
+            # ----- Anti-Duplicate -----
             is_dup = check_and_mark_duplicate(
                 user_id=user_id,
                 target_chat_id=target_chat_id,
@@ -184,14 +142,13 @@ async def forward_messages(
                     )
                 continue
 
-            # ---------- CAPTION + BUTTONS ----------
             final_caption = process_caption(message, settings)
             reply_markup = build_inline_keyboard(settings)
 
-            # ---------- SEND ----------
+            # ==================== SEND ====================
             try:
                 if forward_tag:
-                    await client.forward_messages(
+                    await current_client.forward_messages(
                         chat_id=target_chat_id,
                         from_chat_id=source_chat_id,
                         message_ids=message.id
@@ -200,7 +157,7 @@ async def forward_messages(
                     if message.media:
                         media = getattr(message, message.media.value, None)
                         if media and hasattr(media, "file_id"):
-                            await client.send_cached_media(
+                            await current_client.send_cached_media(
                                 chat_id=target_chat_id,
                                 file_id=media.file_id,
                                 caption=final_caption,
@@ -208,7 +165,7 @@ async def forward_messages(
                                 reply_markup=reply_markup
                             )
                         else:
-                            await client.copy_message(
+                            await current_client.copy_message(
                                 chat_id=target_chat_id,
                                 from_chat_id=source_chat_id,
                                 message_id=message.id,
@@ -217,7 +174,7 @@ async def forward_messages(
                                 reply_markup=reply_markup
                             )
                     else:
-                        await client.send_message(
+                        await current_client.send_message(
                             chat_id=target_chat_id,
                             text=final_caption or message.text or "",
                             parse_mode=ParseMode.HTML,
@@ -227,92 +184,77 @@ async def forward_messages(
 
                 stats.forwarded += 1
 
-                # ---------- Account limit tracking ----------
+                # ---------- Account Limit + Rotation ----------
                 if current_account_id:
-                    updated_acc = increment_account_forwarded(user_id, current_account_id, 1)
+                    updated = increment_account_forwarded(user_id, current_account_id, 1)
 
-                    # If account went to sleep → try to switch (Phase 2 will improve this)
-                    if updated_acc and updated_acc.get("status") == "sleeping":
-                        logger.info(f"Account {current_account_id} reached limit and went to sleep")
+                    if updated and updated.get("status") == AccountStatus.SLEEPING.value:
+                        logger.info(f"Account {current_account_id} reached limit → rotating...")
 
-                # ---------- Job + Stats update ----------
+                        if get_new_client_callback and account_ids:
+                            new_client, new_acc_id = await get_new_client_callback(
+                                user_id, account_ids, strategy
+                            )
+                            if new_client and new_acc_id:
+                                current_client = new_client
+                                current_account_id = new_acc_id
+                                logger.info(f"Switched to account {new_acc_id}")
+                            else:
+                                logger.warning("No available accounts left → pausing job")
+                                if job_id:
+                                    set_job_status(
+                                        user_id, job_id,
+                                        JobStatus.PAUSED.value,
+                                        "All accounts sleeping or unavailable"
+                                    )
+                                return stats
+
+                # Stats update
                 if job_id:
                     update_job_stats(
                         user_id, job_id,
                         {"fetched": 1, "forwarded": 1},
                         current_msg_id=message.id
                     )
-
                 increment_stats(user_id, "target", str(target_chat_id), {"forwarded": 1})
                 if current_account_id:
                     increment_stats(user_id, "account", current_account_id, {"forwarded": 1})
 
             except (FloodWait, SlowmodeWait) as e:
-                wait_time = e.value
-                logger.warning(f"FloodWait/Slowmode: sleeping {wait_time}s")
-                await asyncio.sleep(wait_time)
+                wait = e.value
+                logger.warning(f"FloodWait {wait}s (account {current_account_id})")
+                await asyncio.sleep(wait)
 
-                # Simple one-time retry
-                try:
-                    if message.media:
-                        media = getattr(message, message.media.value, None)
-                        if media and hasattr(media, "file_id"):
-                            await client.send_cached_media(
-                                chat_id=target_chat_id,
-                                file_id=media.file_id,
-                                caption=final_caption,
-                                parse_mode=ParseMode.HTML,
-                                reply_markup=reply_markup
-                            )
-                            stats.forwarded += 1
-                except Exception as retry_err:
-                    logger.error(f"Retry after FloodWait failed: {retry_err}")
-                    stats.errors += 1
+            except (UserDeactivated, AuthKeyUnregistered, SessionRevoked) as e:
+                logger.error(f"Account {current_account_id} is dead: {e}")
+                if get_new_client_callback and account_ids:
+                    new_client, new_acc_id = await get_new_client_callback(
+                        user_id, account_ids, strategy
+                    )
+                    if new_client and new_acc_id:
+                        current_client = new_client
+                        current_account_id = new_acc_id
+                        logger.info(f"Recovered → switched to {new_acc_id}")
+                        continue
+
+                if job_id:
+                    set_job_status(user_id, job_id, JobStatus.PAUSED.value, f"Account error: {e}")
+                return stats
 
             except Exception as e:
-                logger.exception(f"Error forwarding message {message.id}: {e}")
+                logger.exception(f"Error on message {message.id}: {e}")
                 stats.errors += 1
                 if job_id:
                     update_job_stats(user_id, job_id, {"errors": 1}, current_msg_id=message.id)
                 continue
 
-            # ---------- Delay between messages ----------
             if delay > 0:
                 await asyncio.sleep(delay)
 
     except Exception as e:
-        logger.exception(f"Forwarding engine crashed: {e}")
-        if progress_message:
-            try:
-                await progress_message.edit_text(
-                    f"**❌ Forwarding Error**\n\n`{e}`\n\n"
-                    f"Forwarded so far: `{stats.forwarded}`"
-                )
-            except Exception:
-                pass
+        logger.exception(f"Forwarder crashed: {e}")
         if job_id:
             set_job_status(user_id, job_id, JobStatus.FAILED.value, str(e))
         raise
-
-    # ---------- Final report ----------
-    if progress_message:
-        try:
-            await progress_message.edit_text(
-                f"**✅ Forwarding Completed!**\n\n"
-                f"**Source:** `{source_chat_id}`\n"
-                f"**Target:** `{target_chat_id}`\n\n"
-                f"**Fetched:** `{stats.fetched}`\n"
-                f"**Successfully Forwarded:** `{stats.forwarded}`\n"
-                f"**Skipped (Filter):** `{stats.skipped_filter}`\n"
-                f"**Skipped (Duplicate):** `{stats.skipped_duplicate}`\n"
-                f"**Deleted Messages:** `{stats.skipped_deleted}`\n"
-                f"**Errors:** `{stats.errors}`"
-            )
-        except Exception:
-            pass
-
-    if job_id:
-        # Note: Worker will mark as COMPLETED after all targets
-        pass
 
     return stats
