@@ -1,15 +1,22 @@
 # handlers/jobs_handlers.py
+# Updated with Permission Check
+
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery
+from pyrogram import Client as TempClient
 
+from config import Config
 from database import (
     is_admin, ensure_user, get_user_jobs, get_job,
-    set_job_status, delete_job, JobStatus
+    set_job_status, delete_job, JobStatus,
+    get_bot, get_next_available_account
 )
 from handlers.keyboards import (
     jobs_list_keyboard, job_detail_keyboard,
     confirm_delete_job_keyboard
 )
+from core.permissions import validate_job_permissions
+from core.security import decrypt_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,10 +48,12 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
     data = query.data
     ensure_user(user_id)
 
+    # -------------------- List --------------------
     if data == "job:list":
         await show_jobs_list(client, query)
         return
 
+    # -------------------- Create Job --------------------
     if data == "job:create":
         await query.message.edit_text(
             "**📋 Create New Job – Step 1**\n\n"
@@ -56,6 +65,7 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
         client.job_create_state[user_id] = {"step": "source"}
         return await query.answer()
 
+    # -------------------- Open Job --------------------
     if data.startswith("job:open:"):
         job_id = data.split(":")[2]
         job = get_job(user_id, job_id)
@@ -81,6 +91,7 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
         await query.message.edit_text(text, reply_markup=job_detail_keyboard(job))
         return await query.answer()
 
+    # -------------------- START JOB (with Permission Check) --------------------
     if data.startswith("job:start:"):
         job_id = data.split(":")[2]
         job = get_job(user_id, job_id)
@@ -90,16 +101,94 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
         if job.get("status") == JobStatus.RUNNING.value:
             return await query.answer("Job is already running", show_alert=True)
 
+        method = job.get("method")
+        source_chat_id = job.get("source_chat_id")
+        target_chat_ids = job.get("target_chat_ids", [])
+
+        check_client = None
+        try:
+            # Create temporary client for permission check
+            if method == "bot":
+                bot = get_bot(user_id, job.get("bot_id"))
+                if not bot or bot.get("status") != "active":
+                    return await query.answer("Bot not available", show_alert=True)
+
+                check_client = TempClient(
+                    name=f"perm_check_{job_id}",
+                    api_id=Config.API_ID,
+                    api_hash=Config.API_HASH,
+                    bot_token=bot["bot_token"],
+                    in_memory=True,
+                    no_updates=True
+                )
+                await check_client.start()
+
+            elif method == "user":
+                account = get_next_available_account(user_id, job.get("account_ids", []))
+                if not account:
+                    return await query.answer("No available account", show_alert=True)
+
+                session = decrypt_session(account["session_string"])
+                check_client = TempClient(
+                    name=f"perm_check_{job_id}",
+                    api_id=Config.API_ID,
+                    api_hash=Config.API_HASH,
+                    session_string=session,
+                    in_memory=True,
+                    no_updates=True
+                )
+                await check_client.start()
+            else:
+                return await query.answer("Unknown method", show_alert=True)
+
+            # Run permission validation
+            is_valid, msg = await validate_job_permissions(
+                client=check_client,
+                method=method,
+                source_chat_id=source_chat_id,
+                target_chat_ids=target_chat_ids
+            )
+
+            await check_client.stop()
+            check_client = None
+
+            if not is_valid:
+                await query.answer("Permission Error", show_alert=True)
+                await query.message.reply(
+                    f"**❌ Permission Check Failed**\n\n"
+                    f"`{msg}`\n\n"
+                    f"**Rules Reminder:**\n"
+                    f"• Private Source + Bot → Bot must be **Admin**\n"
+                    f"• User Account → Must be **Member** of source\n"
+                    f"• Target → Bot/Account must be **Admin**"
+                )
+                return
+
+        except Exception as e:
+            if check_client:
+                try:
+                    await check_client.stop()
+                except:
+                    pass
+            logger.exception(e)
+            await query.answer("Permission check failed", show_alert=True)
+            await query.message.reply(f"❌ Permission check error:\n`{e}`")
+            return
+
+        # All good → Start Job
         set_job_status(user_id, job_id, JobStatus.RUNNING.value)
-        await query.answer("Job started (worker will pick it up)", show_alert=True)
+        await query.answer("✅ Job started (Permissions OK)", show_alert=True)
 
         job = get_job(user_id, job_id)
         await query.message.edit_text(
-            f"**📋 Job started**\n\nStatus: `running`",
+            f"**📋 Job started**\n\n"
+            f"Status: `running`\n"
+            f"Permissions: ✅ Passed",
             reply_markup=job_detail_keyboard(job)
         )
         return
 
+    # -------------------- Pause --------------------
     if data.startswith("job:pause:"):
         job_id = data.split(":")[2]
         set_job_status(user_id, job_id, JobStatus.PAUSED.value)
@@ -111,6 +200,7 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
         )
         return
 
+    # -------------------- Cancel --------------------
     if data.startswith("job:cancel:"):
         job_id = data.split(":")[2]
         set_job_status(user_id, job_id, JobStatus.CANCELLED.value)
@@ -122,6 +212,7 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
         )
         return
 
+    # -------------------- Delete --------------------
     if data.startswith("job:delete:"):
         job_id = data.split(":")[2]
         job = get_job(user_id, job_id)
