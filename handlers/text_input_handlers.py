@@ -2,13 +2,18 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.enums import ChatType, ParseMode
+from pyrogram.errors import (
+    PhoneCodeInvalid, PhoneCodeExpired, SessionPasswordNeeded,
+    PhoneNumberInvalid, FloodWait
+)
 import logging
 import re
 
+from config import Config
 from database import (
     is_admin, update_target_settings, get_target, get_user_targets,
     add_target, add_forward_bot, add_forward_account, update_account,
-    create_job, get_user_accounts, get_user_bots
+    create_job, get_user_accounts, get_user_bots, get_user_jobs
 )
 from handlers.keyboards import (
     target_settings_keyboard, targets_list_keyboard,
@@ -36,12 +41,188 @@ async def handle_all_text_input(client: Client, message: Message):
                            "forward_state"]:
             state = getattr(client, state_name, {})
             if user_id in state:
+                # If there's a temp client in account_add_state, disconnect it
+                if state_name == "account_add_state" and state[user_id]:
+                    temp_client = state[user_id].get("temp_client")
+                    if temp_client:
+                        try:
+                            await temp_client.disconnect()
+                        except:
+                            pass
                 state[user_id] = None
         await message.reply("✅ Cancelled.")
         return
 
     # ============================================================
-    # 2. ADD TARGET
+    # 2. ACCOUNT LOGIN FLOW (Phone → OTP → 2FA → Session)
+    # ============================================================
+    account_state = getattr(client, "account_add_state", {}).get(user_id)
+    
+    if account_state:
+        step = account_state.get("step")
+        
+        # ---------- Step 1: Phone Number ----------
+        if step == "phone":
+            phone = text.strip()
+            if not phone.startswith("+") or not phone[1:].isdigit():
+                return await message.reply(
+                    "❌ Invalid phone number.\n"
+                    "Please send in international format.\n"
+                    "Example: `+919876543210`"
+                )
+            
+            try:
+                # Create a temporary client just for login
+                temp_client = Client(
+                    name=f"login_{user_id}",
+                    api_id=Config.API_ID,
+                    api_hash=Config.API_HASH,
+                    in_memory=True
+                )
+                await temp_client.connect()
+                
+                sent_code = await temp_client.send_code(phone)
+                
+                # Save state
+                client.account_add_state[user_id] = {
+                    "step": "otp",
+                    "phone": phone,
+                    "phone_code_hash": sent_code.phone_code_hash,
+                    "temp_client": temp_client          # keep reference
+                }
+                
+                await message.reply(
+                    f"**📱 Code Sent!**\n\n"
+                    f"A login code has been sent to `{phone}`.\n\n"
+                    f"Please send the **OTP** code now.\n\n"
+                    f"Type /cancel to cancel."
+                )
+            except PhoneNumberInvalid:
+                await message.reply("❌ Invalid phone number.")
+            except FloodWait as e:
+                await message.reply(f"⏳ FloodWait: Please wait `{e.value}` seconds.")
+            except Exception as e:
+                logger.exception(e)
+                await message.reply(f"❌ Error sending code: `{e}`")
+            return
+        
+        # ---------- Step 2: OTP ----------
+        if step == "otp":
+            otp = text.strip().replace(" ", "")
+            phone = account_state["phone"]
+            phone_code_hash = account_state["phone_code_hash"]
+            temp_client: Client = account_state["temp_client"]
+            
+            try:
+                await temp_client.sign_in(
+                    phone_number=phone,
+                    phone_code_hash=phone_code_hash,
+                    phone_code=otp
+                )
+                
+                # Success → export session
+                session_string = await temp_client.export_session_string()
+                await temp_client.disconnect()
+                
+                # Save to database
+                result = add_forward_account(
+                    user_id=user_id,
+                    phone=phone,
+                    session_string=session_string,
+                    name=phone
+                )
+                
+                client.account_add_state[user_id] = None
+                
+                if result is None:
+                    return await message.reply("⚠️ This phone number is already added.")
+                
+                await message.reply(
+                    f"✅ **Account Added Successfully!**\n\n"
+                    f"**Phone:** `{phone}`\n"
+                    f"**Account ID:** `{result['account_id']}`\n\n"
+                    f"You can now use this account for forwarding jobs."
+                )
+                
+                accounts = get_user_accounts(user_id)
+                await message.reply(
+                    f"**👤 My Accounts** ({len(accounts)})",
+                    reply_markup=accounts_list_keyboard(accounts)
+                )
+                
+            except PhoneCodeInvalid:
+                await message.reply("❌ Invalid OTP. Please try again.")
+            except PhoneCodeExpired:
+                await message.reply("❌ OTP expired. Please start again with /cancel and add account.")
+                client.account_add_state[user_id] = None
+                try:
+                    await temp_client.disconnect()
+                except:
+                    pass
+            except SessionPasswordNeeded:
+                # 2FA is enabled
+                client.account_add_state[user_id] = {
+                    "step": "2fa",
+                    "phone": phone,
+                    "temp_client": temp_client
+                }
+                await message.reply(
+                    "**🔐 Two-Step Verification Enabled**\n\n"
+                    "Please send your **2FA password** now."
+                )
+            except Exception as e:
+                logger.exception(e)
+                await message.reply(f"❌ Login failed: `{e}`")
+                client.account_add_state[user_id] = None
+                try:
+                    await temp_client.disconnect()
+                except:
+                    pass
+            return
+        
+        # ---------- Step 3: 2FA Password ----------
+        if step == "2fa":
+            password = text.strip()
+            temp_client: Client = account_state["temp_client"]
+            phone = account_state["phone"]
+            
+            try:
+                await temp_client.check_password(password)
+                
+                session_string = await temp_client.export_session_string()
+                await temp_client.disconnect()
+                
+                result = add_forward_account(
+                    user_id=user_id,
+                    phone=phone,
+                    session_string=session_string,
+                    name=phone
+                )
+                
+                client.account_add_state[user_id] = None
+                
+                if result is None:
+                    return await message.reply("⚠️ This phone number is already added.")
+                
+                await message.reply(
+                    f"✅ **Account Added Successfully (with 2FA)!**\n\n"
+                    f"**Phone:** `{phone}`\n"
+                    f"**Account ID:** `{result['account_id']}`"
+                )
+                
+                accounts = get_user_accounts(user_id)
+                await message.reply(
+                    f"**👤 My Accounts** ({len(accounts)})",
+                    reply_markup=accounts_list_keyboard(accounts)
+                )
+                
+            except Exception as e:
+                logger.exception(e)
+                await message.reply(f"❌ 2FA failed: `{e}`\n\nPlease try again or /cancel.")
+            return
+
+    # ============================================================
+    # 3. ADD TARGET
     # ============================================================
     add_state = getattr(client, "target_add_state", {}).get(user_id)
     if add_state:
@@ -91,7 +272,7 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 3. ADD FORWARD BOT
+    # 4. ADD FORWARD BOT
     # ============================================================
     bot_add_state = getattr(client, "bot_add_state", {}).get(user_id)
     if bot_add_state:
@@ -128,7 +309,7 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 4. ACCOUNT EDIT (limit / sleep)
+    # 5. ACCOUNT EDIT (limit / sleep)
     # ============================================================
     account_edit = getattr(client, "account_edit_state", {}).get(user_id)
     if account_edit:
@@ -167,7 +348,7 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 5. SETTINGS VALUES (target settings)
+    # 6. SETTINGS VALUES (target settings)
     # ============================================================
     state = getattr(client, "settings_state", {}).get(user_id)
     if state:
@@ -247,7 +428,7 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 6. JOB CREATE – Final Options (last_msg_id + skip)
+    # 7. JOB CREATE – Final Options (last_msg_id + skip)
     # ============================================================
     job_state = getattr(client, "job_create_state", {}).get(user_id)
     if job_state and job_state.get("step") == "final_options":
@@ -296,7 +477,7 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 7. JOB CREATE – Source Detection (link or forward)
+    # 8. JOB CREATE – Source Detection (link or forward)
     # ============================================================
     if job_state and job_state.get("step") == "source":
         # This part is better handled in source_handler, but we keep a simple version
