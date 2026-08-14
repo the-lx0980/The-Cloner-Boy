@@ -271,9 +271,9 @@ async def handle_all_text_input(client: Client, message: Message):
             )
         return
 
-    # ============================================================
-    # 4. ADD FORWARD BOT (Improved with Validation)
-    # ============================================================
+# ============================================================
+# 4. ADD FORWARD BOT (Fixed Version)
+# ============================================================
     bot_add_state = getattr(client, "bot_add_state", {}).get(user_id)
     if bot_add_state:
         token = text.strip()
@@ -287,22 +287,25 @@ async def handle_all_text_input(client: Client, message: Message):
             )
 
         try:
-            # Real validation: temporary client se check karo
-            temp_bot = Client(
-                name=f"validate_bot_{user_id}",
+            # Better validation method
+            from pyrogram import Client as TempClient
+
+            temp_bot = TempClient(
+                name=f"validate_{user_id}_{int(message.id)}",  # unique name
                 api_id=Config.API_ID,
                 api_hash=Config.API_HASH,
                 bot_token=token,
-                in_memory=True
+                in_memory=True,
+                no_updates=True
             )
 
-            await temp_bot.connect()
+            await temp_bot.start()          # start() better hai connect() se
             me = await temp_bot.get_me()
-            await temp_bot.disconnect()
+            await temp_bot.stop()
 
             bot_username = me.username
             bot_name = me.first_name or f"Bot {token[:8]}"
-
+    
             # Save to database
             result = add_forward_bot(
                 user_id=user_id,
@@ -333,7 +336,13 @@ async def handle_all_text_input(client: Client, message: Message):
         except Exception as e:
             error_msg = str(e).lower()
 
-            if "token" in error_msg or "unauthorized" in error_msg:
+            if "auth_key_unregistered" in error_msg or "401" in error_msg:
+                await message.reply(
+                    "❌ **Invalid Bot Token**\n\n"
+                    "Token galat hai ya expire ho gaya hai.\n"
+                    "Naya token @BotFather se leke try karo."
+                )
+            elif "unauthorized" in error_msg or "token" in error_msg:
                 await message.reply("❌ Invalid Bot Token. Please check and try again.")
             elif "flood" in error_msg:
                 await message.reply("⏳ FloodWait! Thodi der baad try karein.")
@@ -341,10 +350,10 @@ async def handle_all_text_input(client: Client, message: Message):
                 logger.exception(e)
                 await message.reply(f"❌ Error adding bot:\n`{e}`")
 
-            # State clear mat karo taaki user dubara try kar sake
-            # client.bot_add_state[user_id] = False   ← optional
+            # Optional: state clear karna hai toh
+            # client.bot_add_state[user_id] = False
 
-        return
+        return    
 
     # ============================================================
     # 5. ACCOUNT EDIT (limit / sleep)
