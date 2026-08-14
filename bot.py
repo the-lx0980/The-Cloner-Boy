@@ -108,7 +108,6 @@ async def dashboard_callbacks(client: Client, query: CallbackQuery):
 
     data = query.data
 
-    # Home / Refresh
     if data in ["dash:home", "dash:refresh"]:
         text = build_dashboard_text(user_id, query.from_user.first_name)
         await query.message.edit_text(
@@ -118,31 +117,32 @@ async def dashboard_callbacks(client: Client, query: CallbackQuery):
         )
         return await query.answer()
 
-    # Targets
-    if data == "dash:targets":
-        from handlers.target_handlers import cmd_targets_internal
-        await cmd_targets_internal(client, query)
+    try:
+        if data == "dash:targets":
+            from handlers.target_handlers import cmd_targets_internal
+            await cmd_targets_internal(client, query)
+            return
+
+        if data == "dash:accounts":
+            from handlers.accounts_handlers import show_accounts_list
+            await show_accounts_list(client, query)
+            return
+
+        if data == "dash:bots":
+            from handlers.bots_handlers import show_bots_list
+            await show_bots_list(client, query)
+            return
+
+        if data == "dash:jobs":
+            from handlers.jobs_handlers import show_jobs_list
+            await show_jobs_list(client, query)
+            return
+
+    except ImportError as e:
+        logger.error(f"Import error in dashboard: {e}")
+        await query.answer("Module not loaded yet. Please restart the bot.", show_alert=True)
         return
 
-    # Accounts
-    if data == "dash:accounts":
-        from handlers.accounts_handlers import show_accounts_list
-        await show_accounts_list(client, query)
-        return
-
-    # Bots
-    if data == "dash:bots":
-        from handlers.bots_handlers import show_bots_list
-        await show_bots_list(client, query)
-        return
-
-    # Jobs
-    if data == "dash:jobs":
-        from handlers.jobs_handlers import show_jobs_list
-        await show_jobs_list(client, query)
-        return
-
-    # Statistics
     if data == "dash:stats":
         counts = get_dashboard_counts(user_id)
         text = f"""
@@ -153,8 +153,6 @@ async def dashboard_callbacks(client: Client, query: CallbackQuery):
 🤖 Forward Bots: `{counts['bots']}`
 📋 Active Jobs: `{counts['active_jobs']}`
 🛡 Total Duplicates Tracked: `{counts['duplicates']:,}`
-
-More detailed stats are available inside each section (Targets / Accounts / Jobs).
 """
         await query.message.edit_text(
             text,
@@ -164,7 +162,6 @@ More detailed stats are available inside each section (Targets / Accounts / Jobs
         )
         return await query.answer()
 
-    # Settings (placeholder)
     if data == "dash:settings":
         await query.answer("Global settings coming soon!", show_alert=True)
         return
