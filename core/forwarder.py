@@ -1,14 +1,17 @@
 # core/forwarder.py
-
 import asyncio
 import logging
-from typing import Dict, Any, Optional, AsyncGenerator, Union
+from typing import Dict, Any, Optional, AsyncGenerator, Union, List
 from pyrogram import Client
 from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 from pyrogram.enums import ParseMode
 
-from database import get_setting
+from database import (
+    get_setting, update_job_stats, set_job_status,
+    increment_account_forwarded, get_next_available_account,
+    increment_stats, JobStatus
+)
 from core.filters import should_process_message
 from core.caption import process_caption, build_inline_keyboard
 from core.anti_duplicate import check_and_mark_duplicate
@@ -18,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 class ForwardStats:
     def __init__(self):
-        self.total = 0
         self.fetched = 0
         self.forwarded = 0
         self.skipped_deleted = 0
@@ -33,11 +35,6 @@ async def custom_iter_messages(
     limit: int,
     offset: int = 0
 ) -> AsyncGenerator[Message, None]:
-    """
-    Custom iter_messages that works with message IDs.
-    limit  = last message ID
-    offset = first message ID (skip before this)
-    """
     current = offset
     while True:
         new_diff = min(200, limit - current)
@@ -65,12 +62,17 @@ async def custom_iter_messages(
 async def forward_messages(
     client: Client,
     user_id: int,
-    source_chat_id: int | str,
+    source_chat_id: Union[int, str],
     target: Dict[str, Any],
     last_msg_id: int,
     skip: int = 0,
     progress_message: Optional[Message] = None,
-    cancel_flag: Optional[Dict] = None
+    cancel_flag: Optional[Dict] = None,
+    # ===== NEW PARAMETERS =====
+    job_id: Optional[str] = None,
+    account_id: Optional[str] = None,          # current account being used
+    account_ids: Optional[List[str]] = None,   # all selected accounts
+    strategy: str = "sequential",
 ):
     settings = target.get("settings", {})
     target_chat_id = target["chat_id"]
@@ -79,8 +81,6 @@ async def forward_messages(
     anti_dup = settings.get("anti_duplicate", True)
 
     stats = ForwardStats()
-    stats.total = last_msg_id - skip
-
     CANCEL = cancel_flag if cancel_flag is not None else {}
 
     try:
@@ -97,12 +97,14 @@ async def forward_messages(
                         f"Fetched: `{stats.fetched}`\n"
                         f"Forwarded: `{stats.forwarded}`"
                     )
+                if job_id:
+                    await set_job_status(user_id, job_id, JobStatus.CANCELLED.value)
                 return stats
 
             stats.fetched += 1
 
-            # Progress every 20 messages
-            if progress_message and stats.fetched % 20 == 0:
+            # Progress update every 25 messages
+            if progress_message and stats.fetched % 25 == 0:
                 try:
                     await progress_message.edit_text(
                         f"**🚀 Forwarding in progress...**\n\n"
@@ -117,7 +119,7 @@ async def forward_messages(
                 except Exception:
                     pass
 
-            # Filters
+            # ===== FILTERS =====
             should, reason = should_process_message(message, settings)
             if not should:
                 if reason == "deleted":
@@ -126,7 +128,7 @@ async def forward_messages(
                     stats.skipped_filter += 1
                 continue
 
-            # Anti-Duplicate
+            # ===== ANTI-DUPLICATE =====
             is_dup = check_and_mark_duplicate(
                 user_id=user_id,
                 target_chat_id=target_chat_id,
@@ -137,11 +139,11 @@ async def forward_messages(
                 stats.skipped_duplicate += 1
                 continue
 
-            # Caption + Buttons
+            # ===== CAPTION + BUTTONS =====
             final_caption = process_caption(message, settings)
             reply_markup = build_inline_keyboard(settings)
 
-            # Send
+            # ===== SEND =====
             try:
                 if forward_tag:
                     await client.forward_messages(
@@ -180,9 +182,28 @@ async def forward_messages(
 
                 stats.forwarded += 1
 
+                # ===== ACCOUNT LIMIT TRACKING =====
+                if account_id:
+                    updated_acc = increment_account_forwarded(user_id, account_id, 1)
+                    # If account went to sleep, we can switch later (worker level)
+
+                # ===== JOB STATS =====
+                if job_id:
+                    update_job_stats(
+                        user_id, job_id,
+                        {"fetched": 1, "forwarded": 1},
+                        current_msg_id=message.id
+                    )
+
+                # ===== GLOBAL STATS =====
+                increment_stats(user_id, "target", str(target_chat_id), {"forwarded": 1})
+                if account_id:
+                    increment_stats(user_id, "account", account_id, {"forwarded": 1})
+
             except FloodWait as e:
                 logger.warning(f"FloodWait: sleeping {e.value}s")
                 await asyncio.sleep(e.value)
+                # simple retry once
                 try:
                     if message.media:
                         media = getattr(message, message.media.value, None)
@@ -194,14 +215,7 @@ async def forward_messages(
                                 parse_mode=ParseMode.HTML,
                                 reply_markup=reply_markup
                             )
-                    else:
-                        await client.send_message(
-                            chat_id=target_chat_id,
-                            text=final_caption or message.text or "",
-                            parse_mode=ParseMode.HTML,
-                            reply_markup=reply_markup
-                        )
-                    stats.forwarded += 1
+                            stats.forwarded += 1
                 except Exception as retry_err:
                     logger.error(f"Retry failed: {retry_err}")
                     stats.errors += 1
@@ -221,6 +235,8 @@ async def forward_messages(
                 f"**❌ Forwarding Error**\n\n`{e}`\n\n"
                 f"Forwarded so far: `{stats.forwarded}`"
             )
+        if job_id:
+            set_job_status(user_id, job_id, JobStatus.FAILED.value, str(e))
         raise
 
     # Final Report
@@ -236,5 +252,8 @@ async def forward_messages(
             f"**Deleted Messages:** `{stats.skipped_deleted}`\n"
             f"**Errors:** `{stats.errors}`"
         )
+
+    if job_id:
+        set_job_status(user_id, job_id, JobStatus.COMPLETED.value)
 
     return stats
