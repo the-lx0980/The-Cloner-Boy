@@ -16,7 +16,7 @@ from handlers.keyboards import (
     confirm_delete_job_keyboard
 )
 from core.permissions import validate_job_permissions
-from core.security import decrypt_session
+#from core.security import decrypt_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
                 if not account:
                     return await query.answer("No available account", show_alert=True)
 
-                session = decrypt_session(account["session_string"])
+                session = account["session_string"]
                 check_client = TempClient(
                     name=f"perm_check_{job_id}",
                     api_id=Config.API_ID,
