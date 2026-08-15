@@ -522,12 +522,10 @@ async def handle_all_text_input(client: Client, message: Message):
             await message.reply(f"❌ Error: `{e}`")
         return
 
-    # ============================================================
-    # 0. QUICK FORWARD – Skip number received -> actually start it
-    # ============================================================
 # ============================================================
 # 7. JOB CREATE – Source Detection (link or forward)
 # ============================================================
+    job_state = getattr(client, "job_create_state", {}).get(user_id)
     if job_state and job_state.get("step") == "source":
         from pyrogram.enums import ChatType
         from database import get_user_targets
