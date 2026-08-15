@@ -62,6 +62,10 @@ async def jobs_callbacks(client: Client, query: CallbackQuery):
 
     # -------------------- Create Job --------------------
     if data == "job:create":
+        # Clear any existing forward state
+        client.forward_state = getattr(client, "forward_state", {})
+        client.forward_state[user_id] = None
+        
         await query.message.edit_text(
             "**📋 Create New Job – Step 1**\n\n"
             "Send the **Source Channel/Group** link or forward a message from it.\n\n"
@@ -460,4 +464,3 @@ async def job_create_callbacks(client: Client, query: CallbackQuery):
             "Example: `15000 200` (skip first 200)"
         )
         return await query.answer()
-        
