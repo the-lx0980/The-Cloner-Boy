@@ -61,6 +61,10 @@ async def source_detector(client: Client, message: Message):
     if not is_admin(user_id):
         return await message.reply("❌ You are not allowed to use this bot.")
 
+    # Clear any existing state
+    client.job_create_state = getattr(client, "job_create_state", {})
+    client.job_create_state[user_id] = None
+
     ensure_user(user_id)
 
     source_chat_id = None
@@ -149,8 +153,11 @@ async def source_options_callback(client: Client, query: CallbackQuery):
         except Exception:
             return await query.answer("Invalid data", show_alert=True)
 
-        # Save state for job creation wizard
+        # Clear any existing state first
         client.job_create_state = getattr(client, "job_create_state", {})
+        client.job_create_state[user_id] = None
+
+        # Save state for job creation wizard
         client.job_create_state[user_id] = {
             "step": "select_targets",
             "source_chat_id": source_chat_id,
@@ -221,6 +228,10 @@ async def forward_callbacks(client: Client, query: CallbackQuery):
         return await query.answer("Not allowed", show_alert=True)
 
     data = query.data
+
+    # Clear any existing job create state
+    client.job_create_state = getattr(client, "job_create_state", {})
+    client.job_create_state[user_id] = None
 
     if data == "fwd:cancel":
         await query.message.edit_text("❌ Cancelled.")
