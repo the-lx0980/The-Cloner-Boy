@@ -57,10 +57,10 @@ async def handle_all_text_input(client: Client, message: Message):
     # 2. ACCOUNT LOGIN FLOW (Phone → OTP → 2FA → Session)
     # ============================================================
     account_state = getattr(client, "account_add_state", {}).get(user_id)
-    
+
     if account_state:
         step = account_state.get("step")
-        
+
         # ---------- Step 1: Phone Number ----------
         if step == "phone":
             phone = text.strip()
@@ -70,7 +70,7 @@ async def handle_all_text_input(client: Client, message: Message):
                     "Please send in international format.\n"
                     "Example: `+919876543210`"
                 )
-            
+
             try:
                 # Create a temporary client just for login
                 temp_client = Client(
@@ -80,9 +80,9 @@ async def handle_all_text_input(client: Client, message: Message):
                     in_memory=True
                 )
                 await temp_client.connect()
-                
+
                 sent_code = await temp_client.send_code(phone)
-                
+
                 # Save state
                 client.account_add_state[user_id] = {
                     "step": "otp",
@@ -90,7 +90,7 @@ async def handle_all_text_input(client: Client, message: Message):
                     "phone_code_hash": sent_code.phone_code_hash,
                     "temp_client": temp_client          # keep reference
                 }
-                
+
                 await message.reply(
                     f"**📱 Code Sent!**\n\n"
                     f"A login code has been sent to `{phone}`.\n\n"
@@ -105,25 +105,25 @@ async def handle_all_text_input(client: Client, message: Message):
                 logger.exception(e)
                 await message.reply(f"❌ Error sending code: `{e}`")
             return
-        
+
         # ---------- Step 2: OTP ----------
         if step == "otp":
             otp = text.strip().replace(" ", "")
             phone = account_state["phone"]
             phone_code_hash = account_state["phone_code_hash"]
             temp_client: Client = account_state["temp_client"]
-            
+
             try:
                 await temp_client.sign_in(
                     phone_number=phone,
                     phone_code_hash=phone_code_hash,
                     phone_code=otp
                 )
-                
+
                 # Success → export session
                 session_string = await temp_client.export_session_string()
                 await temp_client.disconnect()
-                
+
                 # Save to database
                 result = add_forward_account(
                     user_id=user_id,
@@ -131,25 +131,25 @@ async def handle_all_text_input(client: Client, message: Message):
                     session_string=session_string,
                     name=phone
                 )
-                
+
                 client.account_add_state[user_id] = None
-                
+
                 if result is None:
                     return await message.reply("⚠️ This phone number is already added.")
-                
+
                 await message.reply(
                     f"✅ **Account Added Successfully!**\n\n"
                     f"**Phone:** `{phone}`\n"
                     f"**Account ID:** `{result['account_id']}`\n\n"
                     f"You can now use this account for forwarding jobs."
                 )
-                
+
                 accounts = get_user_accounts(user_id)
                 await message.reply(
                     f"**👤 My Accounts** ({len(accounts)})",
                     reply_markup=accounts_list_keyboard(accounts)
                 )
-                
+
             except PhoneCodeInvalid:
                 await message.reply("❌ Invalid OTP. Please try again.")
             except PhoneCodeExpired:
@@ -179,48 +179,96 @@ async def handle_all_text_input(client: Client, message: Message):
                 except:
                     pass
             return
-        
+
         # ---------- Step 3: 2FA Password ----------
         if step == "2fa":
             password = text.strip()
             temp_client: Client = account_state["temp_client"]
             phone = account_state["phone"]
-            
+
             try:
                 await temp_client.check_password(password)
-                
+
                 session_string = await temp_client.export_session_string()
                 await temp_client.disconnect()
-                
+
                 result = add_forward_account(
                     user_id=user_id,
                     phone=phone,
                     session_string=session_string,
                     name=phone
                 )
-                
+
                 client.account_add_state[user_id] = None
-                
+
                 if result is None:
                     return await message.reply("⚠️ This phone number is already added.")
-                
+
                 await message.reply(
                     f"✅ **Account Added Successfully (with 2FA)!**\n\n"
                     f"**Phone:** `{phone}`\n"
                     f"**Account ID:** `{result['account_id']}`"
                 )
-                
+
                 accounts = get_user_accounts(user_id)
                 await message.reply(
                     f"**👤 My Accounts** ({len(accounts)})",
                     reply_markup=accounts_list_keyboard(accounts)
                 )
-                
+
             except Exception as e:
                 logger.exception(e)
                 await message.reply(f"❌ 2FA failed: `{e}`\n\nPlease try again or /cancel.")
             return
 
+    # ============================================================
+    # 0. QUICK FORWARD – Skip number received -> actually start it
+    # ============================================================
+    fwd_state = getattr(client, "forward_state", {}).get(user_id)
+    if fwd_state and fwd_state.get("action") in ("waiting_skip", "waiting_skip_all"):
+        try:
+            skip = int(text)
+            if skip < 0:
+                return await message.reply("❌ Skip cannot be negative.")
+        except ValueError:
+            return await message.reply("❌ Please send a number. Example: `0` or `100`")
+
+        from core.forwarder import forward_messages
+        from handlers.source_handler import FORWARDING, CANCEL_FLAGS
+        from database import get_target, get_user_targets
+
+        source_chat_id = fwd_state["source_chat_id"]
+        last_msg_id = fwd_state["last_msg_id"]
+
+        if fwd_state["action"] == "waiting_skip":
+            targets = [get_target(user_id, fwd_state["target_chat_id"])]
+        else:
+            targets = get_user_targets(user_id)
+        targets = [t for t in targets if t]
+
+        client.forward_state[user_id] = None
+        if not targets:
+            return await message.reply("❌ Target not found.")
+
+        FORWARDING[user_id] = True
+        CANCEL_FLAGS[user_id] = False
+        progress = await message.reply("**🚀 Starting forward...**")
+
+        try:
+            for target in targets:
+                await forward_messages(
+                    client=client, user_id=user_id,
+                    source_chat_id=source_chat_id, target=target,
+                    last_msg_id=last_msg_id, skip=skip,
+                    progress_message=progress, cancel_flag=CANCEL_FLAGS,
+                )
+            await progress.edit_text("**✅ Forwarding finished.**")
+        except Exception as e:
+            logger.exception("Quick forward failed")
+            await progress.edit_text(f"❌ Stopped due to an error:\n`{e}`")
+        finally:
+            FORWARDING[user_id] = False
+        return
     # ============================================================
     # 3. ADD TARGET
     # ============================================================
@@ -305,7 +353,7 @@ async def handle_all_text_input(client: Client, message: Message):
 
             bot_username = me.username
             bot_name = me.first_name or f"Bot {token[:8]}"
-    
+
             # Save to database
             result = add_forward_bot(
                 user_id=user_id,
@@ -475,52 +523,62 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
     # ============================================================
-    # 7. JOB CREATE – Final Options (last_msg_id + skip)
+    # 0. QUICK FORWARD – Skip number received -> actually start it
     # ============================================================
-    job_state = getattr(client, "job_create_state", {}).get(user_id)
-    if job_state and job_state.get("step") == "final_options":
+# ============================================================
+# 7. JOB CREATE – Source Detection (link or forward)
+# ============================================================
+    if job_state and job_state.get("step") == "source":
+        from pyrogram.enums import ChatType
+        from database import get_user_targets
+        from handlers.keyboards import select_targets_keyboard
+
+        source_chat_id = None
+        last_msg_id = None
+
+        if message.forward_from_chat:
+            chat = message.forward_from_chat
+            source_chat_id = chat.username or chat.id
+            last_msg_id = message.forward_from_message_id
+        else:
+            m = re.search(
+                r"(https?://)?(t\.me|telegram\.me|telegram\.dog)/(c/)?([a-zA-Z0-9_]+|\d+)/(\d+)",
+                text
+            )
+            if not m:
+                return await message.reply(
+                    "❌ Couldn't read a source from that.\n\n"
+                    "Forward a message from the source, or send a link like:\n"
+                    "`https://t.me/c/1234567890/100`"
+                )
+            chat_part, last_msg_id = m.group(4), int(m.group(5))
+            source_chat_id = int(f"-100{chat_part}") if chat_part.isdigit() else chat_part
+
         try:
-            parts = text.split()
-            last_msg_id = int(parts[0])
-            skip = int(parts[1]) if len(parts) > 1 else 0
-
-            if last_msg_id < 0 or skip < 0:
-                return await message.reply("❌ Values cannot be negative.")
-
-            # Create the job
-            job = create_job(
-                user_id=user_id,
-                source_chat_id=job_state.get("source_chat_id"),
-                source_title=job_state.get("source_title", "Unknown"),
-                target_chat_ids=job_state.get("selected_targets", []),
-                method=job_state.get("method"),
-                account_ids=job_state.get("selected_accounts"),
-                bot_id=job_state.get("bot_id"),
-                last_msg_id=last_msg_id,
-                skip=skip,
-                future_new_posts=False,  # can be toggled later
-                name=f"Job {job_state.get('source_title', '')[:20]}"
-            )
-
-            client.job_create_state[user_id] = None
-
-            await message.reply(
-                f"✅ **Job Created Successfully!**\n\n"
-                f"**Job ID:** `{job['job_id']}`\n"
-                f"**Source:** {job.get('source_title')}\n"
-                f"**Targets:** {len(job.get('target_chat_ids', []))}\n"
-                f"**Method:** `{job.get('method')}`\n\n"
-                f"Go to **Jobs** section to start it."
-            )
-
-            from handlers.jobs_handlers import show_jobs_list
-            # We can't easily call show_jobs_list here without a query, so just list
-            jobs = get_user_jobs(user_id) if 'get_user_jobs' in globals() else []
-            # fallback simple reply
-        except ValueError:
-            await message.reply("❌ Please send numbers only.\nExample: `15000` or `15000 200`")
+            source_chat = await client.get_chat(source_chat_id)
         except Exception as e:
-            await message.reply(f"❌ Error creating job: `{e}`")
+            return await message.reply(f"❌ Cannot access source chat.\nError: `{e}`")
+
+        if source_chat.type not in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
+            return await message.reply("❌ Source must be a Channel or Group.")
+
+        targets = get_user_targets(user_id)
+        if not targets:
+            client.job_create_state[user_id] = None
+            return await message.reply("❌ No targets yet. Add one first (🎯 Targets → Add Target).")
+
+        job_state.update({
+            "source_chat_id": source_chat.id,
+            "source_title": source_chat.title or "Unknown",
+            "step": "targets",
+            "selected_targets": [],
+        })
+
+        await message.reply(
+            f"**📥 Source Detected:** {source_chat.title}\n\n"
+            f"**📋 Create Job – Step 2**\n\nSelect target(s):",
+            reply_markup=select_targets_keyboard(targets, [])
+        )
         return
 
     # ============================================================
