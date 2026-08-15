@@ -348,7 +348,116 @@ async def job_create_callbacks(client: Client, query: CallbackQuery):
             "Example: `15000 200` (skip first 200)"
         )
         return await query.answer()
-        
-        
-     
 
+
+from database import get_user_targets, get_user_accounts, get_user_bots
+from handlers.keyboards import (
+    select_targets_keyboard, select_method_keyboard,
+    select_accounts_keyboard, select_bot_keyboard
+)
+
+
+@Client.on_callback_query(filters.regex(r"^jobcreate:"))
+async def job_create_callbacks(client: Client, query: CallbackQuery):
+    user_id = query.from_user.id
+    if not is_admin(user_id):
+        return await query.answer("Not allowed", show_alert=True)
+
+    state = getattr(client, "job_create_state", {}).get(user_id)
+    if not state:
+        return await query.answer(
+            "Session expired. Start again with ➕ Create Job.", show_alert=True
+        )
+
+    parts = query.data.split(":")
+    action = parts[1]
+
+    # ---- toggle a target on/off ----
+    if action == "toggle_target":
+        chat_id = int(parts[2])
+        selected = state.setdefault("selected_targets", [])
+        if chat_id in selected:
+            selected.remove(chat_id)
+        else:
+            selected.append(chat_id)
+        targets = get_user_targets(user_id)
+        await query.message.edit_reply_markup(select_targets_keyboard(targets, selected))
+        return await query.answer()
+
+    # ---- targets confirmed -> choose method ----
+    if action == "next_method":
+        if not state.get("selected_targets"):
+            return await query.answer("Select at least one target first.", show_alert=True)
+        state["step"] = "method"
+        await query.message.edit_text(
+            "**📋 Create Job – Step 3**\n\nChoose the forwarding method:",
+            reply_markup=select_method_keyboard()
+        )
+        return await query.answer()
+
+    # ---- method chosen ----
+    if action == "method":
+        method = parts[2]  # "user" or "bot"
+        state["method"] = method
+        if method == "user":
+            accounts = get_user_accounts(user_id)
+            if not accounts:
+                return await query.answer(
+                    "No accounts added yet. Add one first (👤 Accounts).", show_alert=True
+                )
+            state["step"] = "accounts"
+            state["selected_accounts"] = []
+            await query.message.edit_text(
+                "**📋 Create Job – Step 4**\n\nSelect account(s) to use:",
+                reply_markup=select_accounts_keyboard(accounts, [])
+            )
+        else:
+            bots = get_user_bots(user_id)
+            if not bots:
+                return await query.answer(
+                    "No forward bots added yet. Add one first (🤖 Bots).", show_alert=True
+                )
+            state["step"] = "bot"
+            await query.message.edit_text(
+                "**📋 Create Job – Step 4**\n\nSelect the forward bot to use:",
+                reply_markup=select_bot_keyboard(bots)
+            )
+        return await query.answer()
+
+    # ---- toggle account on/off ----
+    if action == "toggle_account":
+        acc_id = parts[2]
+        selected = state.setdefault("selected_accounts", [])
+        if acc_id in selected:
+            selected.remove(acc_id)
+        else:
+            selected.append(acc_id)
+        accounts = get_user_accounts(user_id)
+        await query.message.edit_reply_markup(select_accounts_keyboard(accounts, selected))
+        return await query.answer()
+
+    # ---- accounts confirmed -> ask message range ----
+    if action == "next_options":
+        if not state.get("selected_accounts"):
+            return await query.answer("Select at least one account.", show_alert=True)
+        state["step"] = "final_options"
+        await query.message.edit_text(
+            "**📋 Create Job – Final Step**\n\n"
+            "Send the **Last Message ID** to forward up to, and optionally a **skip** count.\n\n"
+            "Example: `15000` (no skip)\n"
+            "Example: `15000 200` (skip first 200)"
+        )
+        return await query.answer()
+
+    # ---- bot selected -> ask message range ----
+    if action == "select_bot":
+        state["bot_id"] = parts[2]
+        state["step"] = "final_options"
+        await query.message.edit_text(
+            "**📋 Create Job – Final Step**\n\n"
+            "Send the **Last Message ID** to forward up to, and optionally a **skip** count.\n\n"
+            "Example: `15000` (no skip)\n"
+            "Example: `15000 200` (skip first 200)"
+        )
+        return await query.answer()
+        
