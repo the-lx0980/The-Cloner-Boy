@@ -2,13 +2,15 @@
 # Management Bot - Updated for Multi-Account + Jobs Architecture
 # kurigram 2.2.24 | Python 3.14 | PyMongo 4.17.0
 
+import asyncio
 import logging
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ParseMode
 
 from config import Config
 from database import db, ensure_user, is_admin, get_dashboard_counts
+from core.job_worker import job_worker_loop
 
 # Logging setup
 logging.basicConfig(
@@ -17,10 +19,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-
 logging.getLogger("pyrogram").setLevel(logging.WARNING)
 logging.getLogger("pymongo").setLevel(logging.WARNING)
-
 
 # ==================== CLIENT ====================
 app = Client(
@@ -202,6 +202,19 @@ Advanced Multi-Target Forward Management Bot
     await query.answer()
 
 
+async def main():
+    await app.start()
+
+    asyncio.create_task(job_worker_loop(app))
+    logger.info("✅ Job worker started")
+
+    logger.info("Bot is up and running. Press Ctrl+C to stop.")
+    await idle()
+
+    logger.info("Stopping bot...")
+    await app.stop()
+
+
 # ==================== STARTUP ====================
 if __name__ == "__main__":
     logger.info("Connecting to MongoDB...")
@@ -213,4 +226,4 @@ if __name__ == "__main__":
         raise
 
     logger.info("Starting Management Bot with kurigram 2.2.24...")
-    app.run()
+    app.loop.run_until_complete(main())   # reuse the Client's own loop, not a new one() handles start() -> main() -> stop() on ITS OWN loop
