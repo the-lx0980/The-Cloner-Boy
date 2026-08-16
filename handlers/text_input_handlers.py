@@ -523,60 +523,56 @@ async def handle_all_text_input(client: Client, message: Message):
         return
 
 # ============================================================
-# 7. JOB CREATE – Source Detection (link or forward)
+# 6. JOB CREATE – Final Options (last_msg_id + skip)
 # ============================================================
     job_state = getattr(client, "job_create_state", {}).get(user_id)
-    if job_state and job_state.get("step") == "source":
-        from pyrogram.enums import ChatType
-        from database import get_user_targets
-        from handlers.keyboards import select_targets_keyboard
-
-        source_chat_id = None
-        last_msg_id = None
-
-        if message.forward_from_chat:
-            chat = message.forward_from_chat
-            source_chat_id = chat.username or chat.id
-            last_msg_id = message.forward_from_message_id
-        else:
-            m = re.search(
-                r"(https?://)?(t\.me|telegram\.me|telegram\.dog)/(c/)?([a-zA-Z0-9_]+|\d+)/(\d+)",
-                text
-            )
-            if not m:
-                return await message.reply(
-                    "❌ Couldn't read a source from that.\n\n"
-                    "Forward a message from the source, or send a link like:\n"
-                    "`https://t.me/c/1234567890/100`"
-                )
-            chat_part, last_msg_id = m.group(4), int(m.group(5))
-            source_chat_id = int(f"-100{chat_part}") if chat_part.isdigit() else chat_part
-
+    if job_state and job_state.get("step") == "final_options":
+     
         try:
-            source_chat = await client.get_chat(source_chat_id)
-        except Exception as e:
-            return await message.reply(f"❌ Cannot access source chat.\nError: `{e}`")
+            parts = text.split()
+            last_msg_id = int(parts[0])
+            skip = int(parts[1]) if len(parts) > 1 else 0
 
-        if source_chat.type not in [ChatType.CHANNEL, ChatType.GROUP, ChatType.SUPERGROUP]:
-            return await message.reply("❌ Source must be a Channel or Group.")
+            if last_msg_id < 0 or skip < 0:
+                return await message.reply("❌ Values cannot be negative.")
 
-        targets = get_user_targets(user_id)
-        if not targets:
+            job = create_job(
+                user_id=user_id,
+                source_chat_id=job_state.get("source_chat_id"),
+                source_title=job_state.get("source_title", "Unknown"),
+                target_chat_ids=job_state.get("selected_targets", []),
+                method=job_state.get("method"),
+                account_ids=job_state.get("selected_accounts"),
+                bot_id=job_state.get("bot_id"),
+                last_msg_id=last_msg_id,
+                skip=skip,
+                future_new_posts=False,
+                name=f"Job {job_state.get('source_title', '')[:20]}"
+            )
+
             client.job_create_state[user_id] = None
-            return await message.reply("❌ No targets yet. Add one first (🎯 Targets → Add Target).")
+    
+            await message.reply(
+                f"✅ **Job Created Successfully!**\n\n"
+                f"**Job ID:** `{job['job_id']}`\n"
+                f"**Source:** {job.get('source_title')}\n"
+                f"**Targets:** {len(job.get('target_chat_ids', []))}\n"
+                f"**Method:** `{job.get('method')}`\n\n"
+                f"Go to **Jobs** section to start it.",
+                parse_mode=None   # avoid markdown parsing entirely for safety
+            )
 
-        job_state.update({
-            "source_chat_id": source_chat.id,
-            "source_title": source_chat.title or "Unknown",
-            "step": "targets",
-            "selected_targets": [],
-        })
-
-        await message.reply(
-            f"**📥 Source Detected:** {source_chat.title}\n\n"
-            f"**📋 Create Job – Step 2**\n\nSelect target(s):",
-            reply_markup=select_targets_keyboard(targets, [])
-        )
+        except ValueError:
+            await message.reply("❌ Please send numbers only.\nExample: `15000` or `15000 200`")
+        except Exception as e:
+            logger.exception("Job creation failed")   # <-- ALWAYS shows in your console now
+            try:
+                await message.reply(
+                    f"❌ Error creating job: {str(e)[:300]}",
+                    parse_mode=None   # plain text — can't fail on markdown
+                )
+            except Exception:
+                logger.exception("Even the error reply failed to send")
         return
 
     # ============================================================
